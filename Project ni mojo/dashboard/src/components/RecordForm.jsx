@@ -46,13 +46,25 @@ const EMPTY_FORM = {
   pluscode: '',
 }
 
-function Field({ label, children, required }) {
+function Field({ label, children, required, errorMessage }) {
   return (
     <div className="flex flex-col gap-1">
+
       <label className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+        {label}
+        {required && (
+          <span className="text-red-500 ml-0.5">*</span>
+        )}
       </label>
+
       {children}
+
+      {errorMessage && (
+        <span className="text-xs text-red-600 mt-1">
+          {errorMessage}
+        </span>
+      )}
+
     </div>
   )
 }
@@ -72,50 +84,242 @@ export default function RecordForm({ initialData, recordId }) {
   const [form, setForm] = useState(initialData || EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const navigate = useNavigate()
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  function text(field) {
-    return {
-      value: form[field] ?? '',
-      onChange: e => set(field, e.target.value),
-      className: inputClass,
-    }
+function text(field) {
+
+  return {
+
+    value: form[field] ?? '',
+
+    onChange: e => {
+
+      set(field,e.target.value)
+
+      setFieldErrors(prev=>({
+        ...prev,
+        [field]:false
+      }))
+
+    },
+
+
+    className: `
+      ${inputClass}
+
+      ${
+        fieldErrors[field]
+        ? '!border-red-500 !bg-red-200'
+        : ''
+      }
+
+    `
+
   }
+
+}
 
   async function handleSubmit(e) {
-    e.preventDefault()
-    setError('')
-    setSaving(true)
 
-    const payload = {
-      ...form,
-      aging: form.aging === '' ? null : parseInt(form.aging),
-      billed_amount: form.billed_amount === '' ? null : parseFloat(form.billed_amount),
-      crew_payrol: form.crew_payrol === '' ? null : parseFloat(form.crew_payrol),
-      date_assign: form.date_assign || null,
-      date_executed: form.date_executed || null,
-      witness_date: form.witness_date || null,
-      date_returned: form.date_returned || null,
+  e.preventDefault()
+
+  setError('')
+
+
+  // REQUIRED FIELDS
+  const requiredFields = {
+
+    field_order_no: "Field Order no.",
+
+    remove_meter: "Meter Remove no.",
+
+    ins_meter: "Installed Meter no.",
+
+    removed_seal: "Removed seal",
+
+    installed_seal: "Installed seal",
+
+    fo_type: "FO type",
+
+    status_crew: "Status crew",
+
+    date_executed: "Date Executed",
+
+    location: "Location",
+
+    remarks: "Remarks",
+
+    for_batch: "For Batch",
+
+    billed_amount: "Billed Amount"
+
+  }
+
+
+  const errors = {}
+
+
+  Object.keys(requiredFields).forEach(field => {
+
+    if (!form[field] || form[field] === '') {
+
+      errors[field] = "This field cannot be blank"
     }
 
-    let error
-    if (recordId) {
-      ;({ error } = await supabase.from('field_orders').update(payload).eq('id', recordId))
-    } else {
-      ;({ error } = await supabase.from('field_orders').insert([payload]))
-    }
+  })
+
+  // STOP SAVE IF REQUIRED FIELD IS EMPTY
+  if (Object.keys(errors).length > 0) {
+
+console.log(errors)
+
+setFieldErrors(errors)
+
+return
+
+}
+
+  setSaving(true)
+
+  // CHECK DUPLICATE FIELD ORDER NO.
+  const { data: existingFO } = await supabase
+    .from('field_orders')
+    .select('id')
+    .eq(
+      'field_order_no',
+      form.field_order_no
+    )
+    .maybeSingle()
+
+  if (existingFO && existingFO.id !== recordId) {
+
+    setFieldErrors({
+
+      field_order_no: "This Field Order number already exists"
+
+    })
 
     setSaving(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      navigate('/field-orders')
-    }
+
+    return
+
   }
+
+
+
+  // CHECK DUPLICATE INSTALLED METER NO.
+  const { data: existingMeter } = await supabase
+
+    .from('field_orders')
+
+    .select('id')
+
+    .eq(
+      'ins_meter',
+      form.ins_meter
+    )
+
+    .maybeSingle()
+
+
+
+  if (existingMeter && existingMeter.id !== recordId) {
+
+    setFieldErrors({
+
+      ins_meter: "This Installed Meter number already exists"
+
+    })
+
+    setSaving(false)
+
+    return
+
+  }
+
+
+
+  const payload = {
+
+    ...form,
+
+    aging: form.aging === ''
+      ? null
+      : parseInt(form.aging),
+
+
+    billed_amount: form.billed_amount === ''
+      ? null
+      : parseFloat(form.billed_amount),
+
+
+    crew_payrol: form.crew_payrol === ''
+      ? null
+      : parseFloat(form.crew_payrol),
+
+
+    date_assign: form.date_assign || null,
+
+    date_executed: form.date_executed || null,
+
+    witness_date: form.witness_date || null,
+
+    date_returned: form.date_returned || null,
+
+  }
+
+
+
+  let error
+
+
+
+  if (recordId) {
+
+    ;({ error } = await supabase
+
+      .from('field_orders')
+
+      .update(payload)
+
+      .eq('id', recordId))
+
+  } 
+
+  else {
+
+    ;({ error } = await supabase
+
+      .from('field_orders')
+
+      .insert([payload]))
+
+  }
+
+
+
+  setSaving(false)
+
+
+
+  if (error) {
+
+    setError(error.message)
+
+  } 
+
+  else {
+
+    navigate('/field-orders')
+
+  }
+
+}
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -130,7 +334,7 @@ export default function RecordForm({ initialData, recordId }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SectionTitle title="Main Information" />
 
-          <Field label="Field Order No." required>
+          <Field label="Field Order No." required errorMessage={fieldErrors.field_order_no}>
             <input {...text('field_order_no')} placeholder="e.g. F25090604378" />
           </Field>
 
@@ -138,8 +342,8 @@ export default function RecordForm({ initialData, recordId }) {
             <input {...text('service_number')} placeholder="e.g. 43890272-01" />
           </Field>
 
-          <Field label="Status Crew" required>
-            <select {...text('status_crew')} className={selectClass}>
+          <Field label="Status Crew" required  errorMessage={fieldErrors.status_crew}>
+<select {...text('status_crew')}>
               <option value="">— Select —</option>
               <option value="FIELD COMPL.">FIELD COMPL.</option>
               <option value="CANCEL">CANCEL</option>
@@ -150,7 +354,7 @@ export default function RecordForm({ initialData, recordId }) {
             <input type="date" {...text('date_assign')} />
           </Field>
 
-          <Field label="Date Executed">
+          <Field label="Date Executed" errorMessage={fieldErrors.date_executed}>
             <input type="date" {...text('date_executed')} />
           </Field>
 
@@ -189,9 +393,12 @@ export default function RecordForm({ initialData, recordId }) {
             <input {...text('crew_name')} placeholder="e.g. J. BITAGO" />
           </Field>
 
-          <Field label="Location" required>
+          <Field label="Location" required errorMessage={fieldErrors.location}>
             <div className="col-span-full">
-              <input {...text('location')} placeholder="e.g. 0242 SUMULONG, STA CRUZ, ANTIPOLO RIZAL" className={`${inputClass}`} />
+              <input 
+  {...text('location')} 
+  placeholder="e.g. 0242 SUMULONG, STA CRUZ, ANTIPOLO RIZAL"
+/>
             </div>
           </Field>
         </div>
@@ -202,7 +409,7 @@ export default function RecordForm({ initialData, recordId }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SectionTitle title="Remove Meter" />
 
-          <Field label="Remove Meter No.">
+          <Field label="Remove Meter No." errorMessage={fieldErrors.remove_meter}>
             <input {...text('remove_meter')} placeholder="e.g. 108BA055151" />
           </Field>
 
@@ -214,7 +421,7 @@ export default function RecordForm({ initialData, recordId }) {
             <input {...text('demand_seal_aerolock')} placeholder="Seal number" />
           </Field>
 
-          <Field label="Removed Seal">
+          <Field label="Removed Seal" errorMessage={fieldErrors.removed_seal}>
             <input {...text('removed_seal')} placeholder="e.g. A22PT0018882" />
           </Field>
 
@@ -233,7 +440,7 @@ export default function RecordForm({ initialData, recordId }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SectionTitle title="New Installed Meter" />
 
-          <Field label="Installed Meter No.">
+          <Field label="Installed Meter No." errorMessage={fieldErrors.ins_meter}>
             <input {...text('ins_meter')} placeholder="e.g. 125BAS076970" />
           </Field>
 
@@ -245,7 +452,7 @@ export default function RecordForm({ initialData, recordId }) {
             <input {...text('demand_seal_installed')} placeholder="Demand seal" />
           </Field>
 
-          <Field label="Installed Seal (1)">
+          <Field label="Installed Seal (1)" errorMessage={fieldErrors.installed_seal}>
             <input {...text('installed_seal')} placeholder="e.g. A25PT0196346" />
           </Field>
 
@@ -290,8 +497,11 @@ export default function RecordForm({ initialData, recordId }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SectionTitle title="Remarks & Batch Information" />
 
-          <Field label="FO Type" required>
-            <select {...text('fo_type')} className={selectClass}>
+          <Field label="FO Type" required errorMessage={fieldErrors.fo_type}>
+          <select
+            {...text('fo_type')}
+            
+            >
               <option value="">— Select —</option>
               <option value="REPLACE">REPLACE</option>
               <option value="RETIRE">RETIRE</option>
@@ -300,19 +510,16 @@ export default function RecordForm({ initialData, recordId }) {
             </select>
           </Field>
 
-          <Field label="Billed Amount (₱)">
-            <input
-              type="number"
-              step="0.01"
-              value={form.billed_amount ?? ''}
-              onChange={e => set('billed_amount', e.target.value)}
-              className={inputClass}
-              placeholder="e.g. 766.44"
-            />
+          <Field label="Billed Amount (₱)" errorMessage={fieldErrors.billed_amount}>
+            <input type="number" value={form.billed_amount ?? ''}
+              onChange={e => { set('billed_amount', e.target.value) 
+                setFieldErrors(prev=>({...prev, billed_amount:false}))}}
+                className={`${inputClass}${fieldErrors.billed_amount? '!border-red-500 !bg-red-200':''}`}
+                />
           </Field>
 
-          <Field label="For Batch">
-            <select {...text('for_batch')} className={selectClass}>
+          <Field label="For Batch"errorMessage={fieldErrors.for_batch}>
+            <select{...text('for_batch')}>
               <option value="">— Select —</option>
               <option value="ALREADY BATCH">ALREADY BATCH</option>
             </select>
@@ -354,32 +561,49 @@ export default function RecordForm({ initialData, recordId }) {
             </div>
           </Field>
 
-          <Field label="Remarks">
+          <Field label="Remarks" errorMessage={fieldErrors.remarks}>
             <textarea
-              {...text('remarks')}
-              rows={3}
-              placeholder="e.g. REPLACE METER FOR LABTEST"
-              className={`${inputClass} resize-none`}
-            />
+  {...text('remarks')}
+  rows={3}
+  placeholder="e.g. REPLACE METER FOR LABTEST"
+/>
           </Field>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-3 pb-4">
-        <button
-          type="button"
-          onClick={() => navigate('/field-orders')}
-          className="flex items-center gap-2 px-5 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-        >
-          <X size={15} />
-          Cancel
-        </button>
+
+      {/* Sticky Actions */}
+<div
+  className="fixed
+    bottom-0
+    left-64
+    right-0
+    bg-white
+    border-t
+    border-slate-200
+    p-4
+    flex
+    items-center
+    justify-end
+    gap-3
+    shadow-lg
+    z-50
+  "
+>
+  <button
+    type="button"
+    onClick={() => navigate('/field-orders')}
+      className="flex items-center gap-2 px-5 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+  >
+        <X size={15} />
+        Cancel
+      </button>
+
         <button
           type="submit"
           disabled={saving}
           className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
-        >
+  >
           <Save size={15} />
           {saving ? 'Saving...' : recordId ? 'Update Record' : 'Save Record'}
         </button>
