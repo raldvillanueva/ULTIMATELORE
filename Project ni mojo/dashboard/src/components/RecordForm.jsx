@@ -136,27 +136,7 @@ function text(field) {
 
     field_order_no: "Field Order no.",
 
-    remove_meter: "Meter Remove no.",
-
     ins_meter: "Installed Meter no.",
-
-    removed_seal: "Removed seal",
-
-    installed_seal: "Installed seal",
-
-    fo_type: "FO type",
-
-    status_crew: "Status crew",
-
-    date_executed: "Date Executed",
-
-    location: "Location",
-
-    remarks: "Remarks",
-
-    for_batch: "For Batch",
-
-    billed_amount: "Billed Amount"
 
   }
 
@@ -342,7 +322,7 @@ return
             <input {...text('service_number')} placeholder="e.g. 43890272-01" />
           </Field>
 
-          <Field label="Status Crew" required  errorMessage={fieldErrors.status_crew}>
+          <Field label="Status Crew" >
 <select {...text('status_crew')}>
               <option value="">— Select —</option>
               <option value="FIELD COMPL.">FIELD COMPL.</option>
@@ -354,7 +334,7 @@ return
             <input type="date" {...text('date_assign')} />
           </Field>
 
-          <Field label="Date Executed" errorMessage={fieldErrors.date_executed}>
+          <Field label="Date Executed" >
             <input type="date" {...text('date_executed')} />
           </Field>
 
@@ -393,7 +373,7 @@ return
             <input {...text('crew_name')} placeholder="e.g. J. BITAGO" />
           </Field>
 
-          <Field label="Location" required errorMessage={fieldErrors.location}>
+          <Field label="Location" >
             <div className="col-span-full">
               <input 
   {...text('location')} 
@@ -409,7 +389,7 @@ return
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SectionTitle title="Remove Meter" />
 
-          <Field label="Remove Meter No." errorMessage={fieldErrors.remove_meter}>
+          <Field label="Remove Meter No." >
             <input {...text('remove_meter')} placeholder="e.g. 108BA055151" />
           </Field>
 
@@ -421,7 +401,7 @@ return
             <input {...text('demand_seal_aerolock')} placeholder="Seal number" />
           </Field>
 
-          <Field label="Removed Seal" errorMessage={fieldErrors.removed_seal}>
+          <Field label="Removed Seal" >
             <input {...text('removed_seal')} placeholder="e.g. A22PT0018882" />
           </Field>
 
@@ -452,7 +432,7 @@ return
             <input {...text('demand_seal_installed')} placeholder="Demand seal" />
           </Field>
 
-          <Field label="Installed Seal (1)" errorMessage={fieldErrors.installed_seal}>
+          <Field label="Installed Seal (1)" >
             <input {...text('installed_seal')} placeholder="e.g. A25PT0196346" />
           </Field>
 
@@ -497,7 +477,7 @@ return
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <SectionTitle title="Remarks & Batch Information" />
 
-          <Field label="FO Type" required errorMessage={fieldErrors.fo_type}>
+          <Field label="FO Type" >
           <select
             {...text('fo_type')}
             
@@ -510,7 +490,7 @@ return
             </select>
           </Field>
 
-          <Field label="Billed Amount (₱)" errorMessage={fieldErrors.billed_amount}>
+          <Field label="Billed Amount (₱)" >
             <input type="number" value={form.billed_amount ?? ''}
               onChange={e => { set('billed_amount', e.target.value) 
                 setFieldErrors(prev=>({...prev, billed_amount:false}))}}
@@ -518,7 +498,7 @@ return
                 />
           </Field>
 
-          <Field label="For Batch"errorMessage={fieldErrors.for_batch}>
+          <Field label="For Batch">
             <select{...text('for_batch')}>
               <option value="">— Select —</option>
               <option value="ALREADY BATCH">ALREADY BATCH</option>
@@ -561,7 +541,7 @@ return
             </div>
           </Field>
 
-          <Field label="Remarks" errorMessage={fieldErrors.remarks}>
+          <Field label="Remarks" >
             <textarea
   {...text('remarks')}
   rows={3}
