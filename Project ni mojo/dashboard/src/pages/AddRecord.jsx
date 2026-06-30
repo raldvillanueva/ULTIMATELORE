@@ -1,9 +1,15 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import RecordForm from '../components/RecordForm'
 
 export default function AddRecord() {
+
   const navigate = useNavigate()
+
+  const location = useLocation()
+
+  const repeatCount =
+    location.state?.repeatCount || 1
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
@@ -18,7 +24,7 @@ export default function AddRecord() {
           <p className="text-slate-500 text-sm mt-0.5">Fill in the details below to create a new record</p>
         </div>
       </div>
-      <RecordForm />
+      <RecordForm repeatCount={repeatCount} />
     </div>
   )
 }

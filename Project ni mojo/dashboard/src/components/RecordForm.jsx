@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Save, X } from 'lucide-react'
+import { addPendingOrders } from '../lib/pendingStorage'
+import { useLocation } from 'react-router-dom'
 
 const EMPTY_FORM = {
   // Main Info
@@ -80,12 +82,21 @@ function SectionTitle({ title }) {
   )
 }
 
-export default function RecordForm({ initialData, recordId }) {
+export default function RecordForm({ initialData, recordId, repeatCount }) {
   const [form, setForm] = useState(initialData || EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+const [pendingMode, setPendingMode] = useState("queue") // "queue" | "stack"
+const [pendingItems, setPendingItems] = useState(() => {
+  return JSON.parse(localStorage.getItem("pendingOrders") || "[]")
+})
+const [selectedPending, setSelectedPending] = useState([])
   const navigate = useNavigate()
+  const location = useLocation()
+
+const currentRepeat =
+location.state?.currentRepeat || 1
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -124,185 +135,272 @@ function text(field) {
 
 }
 
-  async function handleSubmit(e) {
 
-  e.preventDefault()
-
-  setError('')
-
-
-  // REQUIRED FIELDS
-  const requiredFields = {
-
-    field_order_no: "Field Order no.",
-
-    ins_meter: "Installed Meter no.",
-
+async function saveRecord(payload, recordId) {
+  if (recordId) {
+    return await supabase
+      .from('field_orders')
+      .update(payload)
+      .eq('id', recordId)
   }
 
+  return await supabase
+    .from('field_orders')
+    .insert([payload])
+}
+
+
+async function handleSubmit(e, mode = "supabase") {
+  e.preventDefault()
+  setError('')
+  setSaving(true)
+
+  const isPending = mode === "pending"
+
+  // =========================
+  // REQUIRED FIELDS
+  // =========================
+  const requiredFields = {
+    field_order_no: "Field Order no.",
+    ins_meter: "Installed Meter no.",
+  }
 
   const errors = {}
 
-
   Object.keys(requiredFields).forEach(field => {
-
-    if (!form[field] || form[field] === '') {
-
+    if (!form[field]) {
       errors[field] = "This field cannot be blank"
     }
-
   })
 
-  // STOP SAVE IF REQUIRED FIELD IS EMPTY
   if (Object.keys(errors).length > 0) {
+    setFieldErrors(errors)
+    setSaving(false)
+    return
+  }
 
-console.log(errors)
-
-setFieldErrors(errors)
-
-return
-
-}
-
-  setSaving(true)
-
-  // CHECK DUPLICATE FIELD ORDER NO.
+  // =========================
+  // DUPLICATE CHECKS
+  // =========================
   const { data: existingFO } = await supabase
     .from('field_orders')
     .select('id')
-    .eq(
-      'field_order_no',
-      form.field_order_no
-    )
+    .eq('field_order_no', form.field_order_no)
     .maybeSingle()
 
   if (existingFO && existingFO.id !== recordId) {
-
-    setFieldErrors({
-
-      field_order_no: "This Field Order number already exists"
-
-    })
-
+    setFieldErrors({ field_order_no: "This Field Order number already exists" })
     setSaving(false)
-
     return
-
   }
 
-
-
-  // CHECK DUPLICATE INSTALLED METER NO.
   const { data: existingMeter } = await supabase
-
     .from('field_orders')
-
     .select('id')
-
-    .eq(
-      'ins_meter',
-      form.ins_meter
-    )
-
+    .eq('ins_meter', form.ins_meter)
     .maybeSingle()
 
-
-
   if (existingMeter && existingMeter.id !== recordId) {
+    setFieldErrors({ ins_meter: "This Installed Meter number already exists" })
+    setSaving(false)
+    return
+  }
+
+  // =========================
+  // PAYLOAD
+  // =========================
+  const payload = {
+    ...form,
+    aging: form.aging ? parseInt(form.aging) : null,
+    billed_amount: form.billed_amount ? parseFloat(form.billed_amount) : null,
+    crew_payrol: form.crew_payrol ? parseFloat(form.crew_payrol) : null,
+    date_assign: form.date_assign || null,
+    date_executed: form.date_executed || null,
+    witness_date: form.witness_date || null,
+    date_returned: form.date_returned || null,
+  }
+
+  let error = null
+
+  // =========================
+  // IMPORTANT FIX: RESET FLOW CONTROL
+  // =========================
+  let success = false
+
+  // =========================
+  // SAVE LOGIC (SAME FLOW, CLEANED)
+  // =========================
+
+  if (!isPending) {
+    const { error: insertError } = await supabase
+      .from('field_orders')
+      .insert([payload])
+
+    error = insertError
+
+    if (!error) {
+      success = true
+    }
+  }
+  // =========================
+// DUPLICATE CHECK PENDING
+// =========================
+if (isPending) {
+
+  const existingPending =
+    JSON.parse(localStorage.getItem("pendingOrders") || "[]")
+
+
+  const duplicateFO = existingPending.some(
+    item =>
+      item.field_order_no === form.field_order_no
+  )
+
+
+  if (duplicateFO) {
 
     setFieldErrors({
-
-      ins_meter: "This Installed Meter number already exists"
-
+      field_order_no:
+      "This Field Order number already exists in Pending"
     })
 
     setSaving(false)
-
     return
-
   }
 
 
-
-  const payload = {
-
-    ...form,
-
-    aging: form.aging === ''
-      ? null
-      : parseInt(form.aging),
+  const duplicateMeter = existingPending.some(
+    item =>
+      item.ins_meter === form.ins_meter
+  )
 
 
-    billed_amount: form.billed_amount === ''
-      ? null
-      : parseFloat(form.billed_amount),
+  if (duplicateMeter) {
 
+    setFieldErrors({
+      ins_meter:
+      "This Installed Meter number already exists in Pending"
+    })
 
-    crew_payrol: form.crew_payrol === ''
-      ? null
-      : parseFloat(form.crew_payrol),
-
-
-    date_assign: form.date_assign || null,
-
-    date_executed: form.date_executed || null,
-
-    witness_date: form.witness_date || null,
-
-    date_returned: form.date_returned || null,
-
-  }
-
-
-
-  let error
-
-
-
-  if (recordId) {
-
-    ;({ error } = await supabase
-
-      .from('field_orders')
-
-      .update(payload)
-
-      .eq('id', recordId))
-
-  } 
-
-  else {
-
-    ;({ error } = await supabase
-
-      .from('field_orders')
-
-      .insert([payload]))
-
-  }
-
-
-
-  setSaving(false)
-
-
-
-  if (error) {
-
-    setError(error.message)
-
-  } 
-
-  else {
-
-    navigate('/field-orders')
-
+    setSaving(false)
+    return
   }
 
 }
+  if (isPending) {
+    const existingPending =
+      JSON.parse(localStorage.getItem("pendingOrders") || "[]")
 
+    localStorage.setItem(
+      "pendingOrders",
+      JSON.stringify([
+        ...existingPending,
+        {
+          ...payload,
+          id: crypto.randomUUID(),
+          status: "PENDING"
+        }
+      ])
+    )
+
+    success = true
+  }
+
+  // =========================
+  // STOP IF ERROR
+  // =========================
+  if (error) {
+    setError(error.message)
+    setSaving(false)
+    return
+  }
+
+  // =========================
+  // ONLY RUN REPETITION IF SAVE SUCCESSFUL
+  // (THIS FIXES YOUR BUG)
+  // =========================
+  if (!success) {
+    setSaving(false)
+    return
+  }
+
+  if (currentRepeat < repeatCount) {
+    navigate('/field-orders/add', {
+      state: {
+        repeatCount,
+        currentRepeat: currentRepeat + 1
+      }
+    })
+  } else {
+    navigate('/field-orders')
+  }
+
+  setSaving(false)
+}
+function deletePendingRecord(id) {
+
+  const existingPending =
+    JSON.parse(localStorage.getItem("pendingOrders") || "[]")
+
+
+  const updated = existingPending.filter(
+    item => item.id !== id
+  )
+
+
+  localStorage.setItem(
+    "pendingOrders",
+    JSON.stringify(updated)
+  )
+
+
+  setPendingItems(updated)
+
+}
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    
+    <form onSubmit={(e) => handleSubmit(e, "supabase")}>
+      
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+
+<h3 className="text-sm font-semibold text-slate-700 mb-4">
+FAST ENCODING
+</h3>
+
+
+<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+
+<Field
+label="Field Order No."
+required
+errorMessage={fieldErrors.field_order_no}
+>
+
+<input
+{...text('field_order_no')}
+placeholder="Scan Field Order"
+/>
+
+</Field>
+
+
+
+<Field
+label="Installed Meter No."
+required
+errorMessage={fieldErrors.ins_meter}
+>
+
+<input
+{...text('ins_meter')}
+placeholder="Scan Installed Meter"
+/>
+
+</Field>
+</div>
+
+</div>
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
           {error}
@@ -570,24 +668,83 @@ return
     z-50
   "
 >
+
   <button
     type="button"
     onClick={() => navigate('/field-orders')}
-      className="flex items-center gap-2 px-5 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+    className="
+      flex
+      items-center
+      gap-2
+      px-5
+      py-2
+      border
+      border-slate-200
+      rounded-lg
+      text-sm
+      text-slate-600
+      hover:bg-slate-50
+      transition-colors
+    "
   >
-        <X size={15} />
-        Cancel
-      </button>
+    <X size={15} />
+    Cancel
+  </button>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
+
+  <button
+    type="button"
+    onClick={(e) => handleSubmit(e, "pending")}
+    className="
+      flex
+      items-center
+      gap-2
+      px-5
+      py-2
+      bg-green-600
+      hover:bg-green-700
+      text-white
+      rounded-lg
+      text-sm
+      font-medium
+      transition-colors
+    "
   >
-          <Save size={15} />
-          {saving ? 'Saving...' : recordId ? 'Update Record' : 'Save Record'}
-        </button>
-      </div>
+    Add to Pending
+  </button>
+
+
+
+  <button
+    type="submit"
+    disabled={saving}
+    className="
+      flex
+      items-center
+      gap-2
+      px-5
+      py-2
+      bg-blue-600
+      hover:bg-blue-700
+      disabled:opacity-60
+      text-white
+      rounded-lg
+      text-sm
+      font-medium
+      transition-colors
+    "
+  >
+    <Save size={15} />
+    {saving
+? 'Saving...'
+: recordId
+? 'Update Record'
+: `Save Record (${currentRepeat}/${repeatCount})`
+}
+  </button>
+
+
+</div>
     </form>
   )
 }

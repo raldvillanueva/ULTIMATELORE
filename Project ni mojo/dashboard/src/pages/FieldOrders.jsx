@@ -93,10 +93,52 @@ export default function FieldOrders() {
   const [batchFilter, setBatchFilter] = useState('All')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [editRow, setEditRow] = useState(null)
+  const [pendingEdit,setPendingEdit]=useState(null)
   const [editForm, setEditForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const navigate = useNavigate()
+  const [pending,setPending] = useState([])
+  const [selectedRows,setSelectedRows]=useState([])
+  const [repeatCount,setRepeatCount] = useState(1)
+  const [pendingMode, setPendingMode] = useState("STACK") 
+const displayPending =
+  pendingMode === "QUEUE"
+    ? [...pending]
+    : [...pending].reverse()
+
+async function deleteSelected(){
+
+
+await supabase
+.from('field_orders')
+.delete()
+.in('id',selectedRows)
+
+
+
+setSelectedRows([])
+
+fetchRecords()
+
+
+}
+function toggleRow(id){
+
+setSelectedRows(prev=>
+
+prev.includes(id)
+
+?
+prev.filter(x=>x!==id)
+
+:
+
+[...prev,id]
+
+)
+
+}
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
@@ -126,8 +168,28 @@ export default function FieldOrders() {
     setLoading(false)
   }, [page, search, statusFilter, foTypeFilter, batchFilter])
 
-  useEffect(() => { fetchRecords() }, [fetchRecords])
-  useEffect(() => { setPage(0) }, [search, statusFilter, foTypeFilter, batchFilter])
+useEffect(() => { 
+  fetchRecords() 
+}, [fetchRecords])
+
+
+useEffect(() => { 
+  setPage(0) 
+}, [search, statusFilter, foTypeFilter, batchFilter])
+
+
+// ADD THIS
+useEffect(() => {
+
+  const data = JSON.parse(
+    localStorage.getItem("pendingOrders") || "[]"
+  )
+
+
+  setPending(data)
+
+
+}, [])
 
   function openEdit(row) {
     setEditRow(row)
@@ -142,21 +204,131 @@ export default function FieldOrders() {
   function sf(field, value) { setEditForm(prev => ({ ...prev, [field]: value })) }
 
   async function handleSave() {
-    setSaving(true); setSaveError('')
-    const payload = {
-      ...editForm,
-      aging: editForm.aging === '' ? null : parseInt(editForm.aging),
-      billed_amount: editForm.billed_amount === '' ? null : parseFloat(editForm.billed_amount),
-      crew_payrol: editForm.crew_payrol === '' ? null : parseFloat(editForm.crew_payrol),
-      date_assign: editForm.date_assign || null,
-      date_executed: editForm.date_executed || null,
-      witness_date: editForm.witness_date || null,
-      date_returned: editForm.date_returned || null,
-    }
-    const { error } = await supabase.from('field_orders').update(payload).eq('id', editRow.id)
-    setSaving(false)
-    if (error) { setSaveError(error.message) } else { closeEdit(); fetchRecords() }
+
+  setSaving(true)
+  setSaveError('')
+
+
+  const payload = {
+
+    ...editForm,
+
+    aging: editForm.aging === ''
+      ? null
+      : parseInt(editForm.aging),
+
+    billed_amount: editForm.billed_amount === ''
+      ? null
+      : parseFloat(editForm.billed_amount),
+
+    crew_payrol: editForm.crew_payrol === ''
+      ? null
+      : parseFloat(editForm.crew_payrol),
+
+    date_assign: editForm.date_assign || null,
+
+    date_executed: editForm.date_executed || null,
+
+    witness_date: editForm.witness_date || null,
+
+    date_returned: editForm.date_returned || null,
+
   }
+
+
+
+  // CHECK IF THIS RECORD IS FROM PENDING
+
+const localPending =
+  JSON.parse(localStorage.getItem("pendingOrders") || "[]")
+
+const isPending =
+  localPending.some(item => item.id === editRow.id)
+
+  let error
+
+
+
+  if(isPending){
+
+
+    // SAVE PENDING TO DATABASE
+
+    const result =
+    await supabase
+    .from('field_orders')
+    .insert([payload])
+
+
+    error = result.error
+
+
+
+    if(!error){
+
+
+      const updated =
+      localPending.filter(
+        item =>
+        item.id !== editRow.id
+      )
+
+
+      localStorage.setItem(
+        "pendingOrders",
+        JSON.stringify(updated)
+      )
+
+
+      setPending(updated)
+
+    }
+
+
+
+  }
+  else{
+
+
+    // NORMAL EDIT RECORD
+
+    const result =
+    await supabase
+    .from('field_orders')
+    .update(payload)
+    .eq(
+      'id',
+      editRow.id
+    )
+
+
+    error = result.error
+
+
+  }
+
+
+
+
+
+  setSaving(false)
+
+
+
+  if(error){
+
+    setSaveError(error.message)
+
+  }
+  else{
+
+    closeEdit()
+
+    fetchRecords()
+
+  }
+
+}
 
   async function handleDelete(id) {
     const { error } = await supabase.from('field_orders').delete().eq('id', id)
@@ -164,6 +336,70 @@ export default function FieldOrders() {
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
+  async function handleSavePending(item){
+
+
+const savedItem = {
+  ...item,
+
+  status_crew: "",
+  date_assign: null,
+  date_executed: null
+}
+
+
+const {error}=await supabase
+.from('field_orders')
+.insert([savedItem])
+
+
+if(error){
+
+console.log(error)
+return
+
+}
+
+
+const updated =
+localPending.filter(
+p=>p.id !== item.id
+)
+
+
+localStorage.setItem(
+"pendingOrders",
+JSON.stringify(updated)
+)
+
+
+setPending(updated)
+
+
+fetchRecords()
+
+}
+
+function openPendingEdit(item){
+
+setPendingEdit(item)
+
+}
+
+function removePending(id){
+
+  const updated = pending.filter(
+    p => p.id !== id
+  )
+
+  localStorage.setItem(
+    "pendingOrders",
+    JSON.stringify(updated)
+  )
+
+  setPending(updated)
+
+}
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }} className="gap-4">
@@ -173,12 +409,64 @@ export default function FieldOrders() {
           <h1 className="text-2xl font-bold text-slate-800">Field Orders</h1>
           <p className="text-slate-500 text-sm mt-0.5">{total.toLocaleString()} total records</p>
         </div>
-        <button
-          onClick={() => navigate('/field-orders/add')}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} /> Add Record
-        </button>
+        <div className="flex items-center gap-3">
+
+  <input
+    type="number"
+    min="1"
+    value={repeatCount}
+    onChange={
+      e => setRepeatCount(Number(e.target.value))
+    }
+    className="
+      px-3
+      py-2
+      border
+      border-slate-200
+      rounded-lg
+      w-24
+      text-sm
+      focus:outline-none
+      focus:ring-2
+      focus:ring-blue-500
+    "
+    placeholder="Qty"
+  />
+
+
+<button
+  onClick={() =>
+    navigate('/field-orders/add',{
+      state:{
+        repeatCount,
+        currentRepeat:1
+      }
+    })
+  }
+  className="
+    flex
+    items-center
+    gap-2
+    bg-blue-600
+    hover:bg-blue-700
+    text-white
+    px-4
+    py-2
+    rounded-lg
+    text-sm
+    font-medium
+    transition-colors
+  "
+>
+
+<Plus size={16}/>
+
+Add Record
+
+</button>
+
+
+</div>
       </div>
 
       {/* Filters */}
@@ -206,13 +494,294 @@ export default function FieldOrders() {
         </div>
       </div>
 
+        {/* Pending Records */}
+     {/* Pending Spreadsheet */}
+
+<div className="
+flex-1
+min-h-0
+bg-white
+rounded-xl
+shadow-sm
+border
+border-slate-200
+flex
+flex-col
+overflow-hidden
+mt-4
+">
+
+<div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+  <h2 className="font-semibold text-slate-800">
+    Pending Records
+  </h2>
+  <select
+    value={pendingMode}
+    onChange={(e) => setPendingMode(e.target.value)}
+    className="px-2 py-1 border rounded text-xs"
+  >
+    <option value="STACK">STACK</option>
+    <option value="QUEUE">QUEUE</option>
+  </select>
+
+</div>
+
+<div className="overflow-auto">
+<table 
+className="text-xs border-collapse"
+style={{
+minWidth:'max-content',
+width:'100%'
+}}
+>
+
+<thead className="sticky top-0 z-10">
+
+<tr style={{background:'#1e293b'}}>
+
+
+<th className="
+px-3
+py-2
+text-left
+text-slate-300
+">
+
+#
+
+</th>
+
+
+<th className="
+px-3
+py-2
+text-left
+text-slate-300
+">
+
+FIELD ORDER
+
+</th>
+
+
+<th className="
+px-3
+py-2
+text-left
+text-slate-300
+">
+
+INSTALLED METER
+
+</th>
+
+
+<th className="
+px-3
+py-2
+text-left
+text-slate-300
+">
+
+STATUS
+
+</th>
+
+
+<th className="
+px-3
+py-2
+text-left
+text-slate-300
+">
+
+ACTION
+
+</th>
+
+
+</tr>
+
+</thead>
+
+
+
+<tbody>
+
+
+{displayPending.map((row,index)=>(
+
+
+<tr
+
+key={row.id}
+
+onClick={()=>openEdit(row)}
+
+className="
+cursor-pointer
+border-b
+border-slate-100
+hover:bg-slate-50
+"
+
+
+>
+
+
+<td className="px-3 py-2">
+
+{index+1}
+
+</td>
+
+
+<td className="px-3 py-2">
+
+{row.field_order_no}
+
+</td>
+
+
+<td className="px-3 py-2">
+
+{row.ins_meter}
+
+</td>
+
+
+<td className="
+px-3
+py-2
+text-orange-500
+font-medium
+">
+
+PENDING
+
+</td>
+
+
+<td className="px-3 py-2">
+
+<button
+
+onClick={(e)=>{
+
+e.stopPropagation()
+
+removePending(row.id)
+
+}}
+
+className="
+bg-red-600
+text-white
+px-3
+py-1
+rounded
+"
+
+>
+
+Remove
+
+</button>
+
+</td>
+
+
+</tr>
+
+
+))
+
+}
+
+
+</tbody>
+
+
+</table>
+
+
+</div>
+
+
+</div>
+{/* Bulk Delete */}
+{
+  selectedRows.length > 0 && (
+
+    <div className="flex justify-end">
+      <button
+
+        onClick={deleteSelected}
+
+        className="
+        bg-red-600
+        hover:bg-red-700
+        text-white
+        px-4
+        py-2
+        rounded-lg
+        text-sm
+        font-medium
+        "
+
+      >
+
+        Delete Selected ({selectedRows.length})
+
+      </button>
+    </div>
+
+  )
+}
       {/* Spreadsheet */}
       <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-auto">
           <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%' }}>
             <thead className="sticky top-0 z-10">
               <tr style={{ background: '#1e293b' }}>
-                <th style={{ width: 40, minWidth: 40, background: '#1e293b' }} className="sticky left-0 z-20 px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700">#</th>
+                <th
+style={{ width:40, minWidth:40, background:'#1e293b' }}
+className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
+>
+<input
+
+type="checkbox"
+
+checked={
+selectedRows.length === records.length &&
+records.length > 0
+}
+
+onChange={(e)=>{
+
+
+if(e.target.checked){
+
+
+setSelectedRows(
+records.map(row=>row.id)
+)
+
+
+}
+else{
+
+
+setSelectedRows([])
+
+
+}
+
+
+}}
+
+/>
+</th>
                 {COLS.map(col => (
                   <th
                     key={col.key}
@@ -242,11 +811,19 @@ export default function FieldOrders() {
                   const sel = editRow?.id === row.id
                   return (
                     <tr
-                      key={row.id}
-                      onClick={() => sel ? closeEdit() : openEdit(row)}
-                      style={{ background: sel ? '#eff6ff' : undefined }}
-                      className={`cursor-pointer border-b border-slate-100 transition-colors group ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : 'hover:bg-slate-50'}`}
-                    >
+  key={row.id}
+  onClick={() => sel ? closeEdit() : openEdit(row)}
+  style={{ background: sel ? '#eff6ff' : undefined }}
+  className={`cursor-pointer border-b border-slate-100 transition-colors group ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : 'hover:bg-slate-50'}`}
+>
+  <td className="px-2 py-2 text-center">
+  <input
+  type="checkbox"
+  checked={selectedRows.includes(row.id)}
+  onClick={(e) => e.stopPropagation()}
+  onChange={() => toggleRow(row.id)}
+/>
+</td>
                       <td
                         style={{ width: 40, minWidth: 40, background: sel ? '#eff6ff' : 'white' }}
                         className="sticky left-0 z-[5] px-2 py-2 text-center text-slate-400 border-r border-slate-100 group-hover:bg-slate-50"
@@ -286,7 +863,140 @@ export default function FieldOrders() {
           )}
         </div>
       </div>
+{
+pendingEdit && (
 
+<div className="
+fixed
+right-0
+top-0
+h-full
+w-[500px]
+bg-white
+shadow-xl
+z-50
+p-5
+">
+
+
+<h2 className="
+font-bold
+text-lg
+mb-4
+">
+
+Edit Pending Record
+
+</h2>
+
+
+
+<label>
+Field Order
+</label>
+
+<input
+
+value={pendingEdit.field_order_no}
+
+onChange={
+e=>
+
+setPendingEdit({
+
+...pendingEdit,
+
+field_order_no:e.target.value
+
+})
+
+}
+
+className={iCls}
+
+/>
+
+
+
+<label className="block mt-3">
+
+Installed Meter
+
+</label>
+
+
+<input
+
+value={pendingEdit.ins_meter}
+
+onChange={
+e=>
+
+setPendingEdit({
+
+...pendingEdit,
+
+ins_meter:e.target.value
+
+})
+
+}
+
+className={iCls}
+
+/>
+
+
+
+<button
+
+onClick={()=>{
+
+const updated =
+pending.map(
+p=>
+p.id===pendingEdit.id
+?
+pendingEdit
+:
+p
+)
+
+
+localStorage.setItem(
+"pendingOrders",
+JSON.stringify(updated)
+)
+
+
+setPending(updated)
+
+setPendingEdit(null)
+
+
+}}
+
+className="
+mt-5
+bg-blue-600
+text-white
+px-4
+py-2
+rounded
+"
+
+>
+
+Update Pending
+
+</button>
+
+
+
+</div>
+
+)
+}
       {/* Edit Drawer */}
       {editRow && editForm && (
         <>
@@ -470,13 +1180,72 @@ export default function FieldOrders() {
               </PS>
 
               <div className="pt-1 border-t border-slate-100">
-                <button
-                  onClick={() => { closeEdit(); setDeleteTarget(editRow) }}
-                  className="w-full px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Delete this record
-                </button>
-              </div>
+
+<button
+
+onClick={() => {
+
+  const localPending =
+    JSON.parse(
+      localStorage.getItem("pendingOrders") || "[]"
+    )
+
+
+  const isPending =
+    localPending.some(
+      item => item.id === editRow.id
+    )
+
+
+  if(isPending){
+
+    const updated =
+      localPending.filter(
+        item => item.id !== editRow.id
+      )
+
+
+    localStorage.setItem(
+      "pendingOrders",
+      JSON.stringify(updated)
+    )
+
+
+    setPending(updated)
+
+    closeEdit()
+
+  }
+  else{
+
+    closeEdit()
+    setDeleteTarget(editRow)
+
+  }
+
+
+}}
+
+className="
+w-full
+px-4
+py-2
+border
+border-red-200
+text-red-600
+hover:bg-red-50
+rounded-lg
+text-sm
+font-medium
+"
+
+>
+
+Delete this record
+
+</button>
+
+</div>
             </div>
           </div>
         </>
