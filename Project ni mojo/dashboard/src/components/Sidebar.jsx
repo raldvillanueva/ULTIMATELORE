@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, ClipboardList, Zap } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Zap, Clock } from 'lucide-react'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/field-orders', icon: ClipboardList, label: 'Field Orders' },
+  { to: '/pending-records', icon: Clock, label: 'Pending Records' },
 ]
 
 export default function Sidebar() {

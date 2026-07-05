@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Plus, Search, ChevronLeft, ChevronRight, X, Save } from 'lucide-react'
+import { Plus, Search, ChevronLeft, ChevronRight, X, Save, Download, Upload } from 'lucide-react'
+import ImportModal from '../components/ImportModal'
 
 const PAGE_SIZE = 50
 
@@ -13,7 +14,7 @@ const EMPTY_FORM = {
   status_crew: '', date_assign: '', for_check: false, date_executed: '', type_of_meter: '',
   job_description: '', crew_name: '', location: '', service_number: '', field_order_no: '',
   remove_meter: '', r_serial_number: '', demand_seal_aerolock: '', removed_seal: '',
-  cabinet_seal_remove: '', reading_kwh: '', ins_meter: '', ins_serial_number: '',
+  cabinet_seal_remove: '', reading_kwh: '', demand_kwh_cum: '', ins_meter: '', ins_serial_number: '',
   demand_seal_installed: '', installed_seal: '', cabinet_seal_installed: '', tln_tag: '',
   pole_tag: '', booba_number: '', mdltr_no: '', aging: '', witness_date: '', remarks: '',
   mflt_checklist: false, fo_type: '', billed_amount: '', for_batch: '', date_returned: '',
@@ -57,29 +58,47 @@ function PS({ title, children }) {
 }
 
 const COLS = [
-  { label: 'STATUS CREW', key: 'status_crew', w: 120, render: r => <StatusBadge status={r.status_crew} /> },
-  { label: 'DATE ASSIGN', key: 'date_assign', w: 105, render: r => r.date_assign || '—' },
-  { label: 'CHK', key: 'for_check', w: 44, render: r => r.for_check ? <span className="text-emerald-600 font-bold">✓</span> : '' },
-  { label: 'DATE EXEC', key: 'date_executed', w: 105, render: r => r.date_executed || '—' },
-  { label: 'METER TYPE', key: 'type_of_meter', w: 130, render: r => r.type_of_meter || '—' },
-  { label: 'JOB DESC', key: 'job_description', w: 90, render: r => r.job_description || '—' },
-  { label: 'CREW NAME', key: 'crew_name', w: 130, render: r => r.crew_name || '—' },
-  { label: 'LOCATION', key: 'location', w: 260, render: r => r.location || '—' },
-  { label: 'SERVICE NO.', key: 'service_number', w: 125, render: r => r.service_number || '—' },
-  { label: 'FIELD ORDER', key: 'field_order_no', w: 140, mono: true, render: r => r.field_order_no || '—' },
-  { label: 'REMOVE METER', key: 'remove_meter', w: 125, render: r => r.remove_meter || '—' },
-  { label: 'INS. METER', key: 'ins_meter', w: 125, render: r => r.ins_meter || '—' },
-  { label: 'INS. SEAL (1)', key: 'installed_seal', w: 125, render: r => r.installed_seal || '—' },
-  { label: 'CAB. SEAL (2)', key: 'cabinet_seal_installed', w: 120, render: r => r.cabinet_seal_installed || '—' },
-  { label: 'REMARKS', key: 'remarks', w: 200, render: r => r.remarks || '—' },
-  { label: 'MFLT', key: 'mflt_checklist', w: 52, render: r => r.mflt_checklist ? <span className="text-emerald-600 font-bold">✓</span> : '' },
-  { label: 'FO TYPE', key: 'fo_type', w: 90, render: r => <FoTypeBadge type={r.fo_type} /> },
-  { label: 'BILLED', key: 'billed_amount', w: 90, render: r => r.billed_amount != null ? `₱${parseFloat(r.billed_amount).toFixed(2)}` : '—' },
-  { label: 'BATCH', key: 'for_batch', w: 90, render: r => r.for_batch?.toUpperCase().includes('ALREADY') ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">Batched</span> : <span className="text-slate-300">—</span> },
-  { label: 'DATE RET.', key: 'date_returned', w: 100, render: r => r.date_returned || '—' },
-  { label: 'PAYROL', key: 'crew_payrol', w: 80, render: r => r.crew_payrol != null ? `₱${r.crew_payrol}` : '—' },
-  { label: '%', key: 'percentage', w: 60, render: r => r.percentage || '—' },
-  { label: 'PLUSCODE', key: 'pluscode', w: 85, render: r => r.pluscode || '—' },
+  // — MAIN DATA —
+  { label: 'STATUS CREW',         key: 'status_crew',           w: 120, render: r => <StatusBadge status={r.status_crew} /> },
+  { label: 'DATE ASSIGN',         key: 'date_assign',           w: 105, render: r => r.date_assign || '—' },
+  { label: 'FOR CHECK',           key: 'for_check',             w: 80,  render: r => r.for_check ? <span className="text-emerald-600 font-bold">✓</span> : '' },
+  { label: 'FOR CHECKING (DATE)', key: 'date_executed',         w: 140, render: r => r.date_executed || '—' },
+  { label: 'TYPE OF METER',       key: 'type_of_meter',         w: 130, render: r => r.type_of_meter || '—' },
+  { label: 'JOB DESCRIPTION',     key: 'job_description',       w: 120, render: r => r.job_description || '—' },
+  { label: 'CREW NAME',           key: 'crew_name',             w: 130, render: r => r.crew_name || '—' },
+  { label: 'LOCATION',            key: 'location',              w: 260, render: r => r.location || '—' },
+  { label: 'SERVICE NUMBER',      key: 'service_number',        w: 135, render: r => r.service_number || '—' },
+  { label: 'FIELD ORDER/FO',      key: 'field_order_no',        w: 145, mono: true, render: r => r.field_order_no || '—' },
+  // — REMOVE METER —
+  { label: 'REMOVE METER',        key: 'remove_meter',          w: 130, render: r => r.remove_meter || '—' },
+  { label: 'R. SERIAL NUMBER',    key: 'r_serial_number',       w: 130, render: r => r.r_serial_number || '—' },
+  { label: 'DEMAND SEAL NO.5',    key: 'demand_seal_aerolock',  w: 140, render: r => r.demand_seal_aerolock || '—' },
+  { label: 'REMOVED SEAL',        key: 'removed_seal',          w: 120, render: r => r.removed_seal || '—' },
+  { label: 'CABINET SEAL (2)',     key: 'cabinet_seal_remove',   w: 130, render: r => r.cabinet_seal_remove || '—' },
+  { label: 'READING (kWh)',        key: 'reading_kwh',           w: 115, render: r => r.reading_kwh || '—' },
+  { label: 'DEMAND/Cum (kWh)', key: 'demand_kwh_cum',    w: 130, render: r => r.demand_kwh_cum || '—' },
+  // — NEW INSTALLED METER —
+  { label: 'INS. METER',          key: 'ins_meter',             w: 130, render: r => r.ins_meter || '—' },
+  { label: 'SERIAL NUMBER',       key: 'ins_serial_number',     w: 130, render: r => r.ins_serial_number || '—' },
+  { label: 'DEMAND SEAL (5)',      key: 'demand_seal_installed', w: 130, render: r => r.demand_seal_installed || '—' },
+  { label: 'INSTALLED SEAL (1)',   key: 'installed_seal',        w: 130, render: r => r.installed_seal || '—' },
+  { label: 'CABINET SEAL (2)',     key: 'cabinet_seal_installed',w: 130, render: r => r.cabinet_seal_installed || '—' },
+  // — OTHER INFO —
+  { label: 'TLN TAG',             key: 'tln_tag',               w: 90,  render: r => r.tln_tag || '—' },
+  { label: 'POLE TAG',            key: 'pole_tag',              w: 90,  render: r => r.pole_tag || '—' },
+  { label: 'BOOBA NUMBER',        key: 'booba_number',          w: 115, render: r => r.booba_number || '—' },
+  { label: 'MDLTR NO.',           key: 'mdltr_no',              w: 90,  render: r => r.mdltr_no || '—' },
+  { label: 'AGING',               key: 'aging',                 w: 70,  render: r => r.aging != null ? r.aging : '—' },
+  { label: 'WITNESS DATE',        key: 'witness_date',          w: 115, render: r => r.witness_date || '—' },
+  { label: 'REMARKS',             key: 'remarks',               w: 200, render: r => r.remarks || '—' },
+  { label: 'MFLT CHECKLIST',      key: 'mflt_checklist',        w: 110, render: r => r.mflt_checklist ? <span className="text-emerald-600 font-bold">✓</span> : '' },
+  { label: 'FO TYPE',             key: 'fo_type',               w: 90,  render: r => <FoTypeBadge type={r.fo_type} /> },
+  { label: 'BILLED AMOUNT',       key: 'billed_amount',         w: 110, render: r => r.billed_amount != null ? `₱${parseFloat(r.billed_amount).toFixed(2)}` : '—' },
+  { label: 'FOR BATCH',           key: 'for_batch',             w: 100, render: r => r.for_batch?.toUpperCase().includes('ALREADY') ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">Batched</span> : <span className="text-slate-300">—</span> },
+  { label: 'DATE RETURNED',       key: 'date_returned',         w: 115, render: r => r.date_returned || '—' },
+  { label: 'CREW PAYROLL',        key: 'crew_payrol',           w: 110, render: r => r.crew_payrol != null ? `₱${r.crew_payrol}` : '—' },
+  { label: '%',                   key: 'percentage',            w: 60,  render: r => r.percentage || '—' },
+  { label: 'PLUSCODE',            key: 'pluscode',              w: 90,  render: r => r.pluscode || '—' },
 ]
 
 export default function FieldOrders() {
@@ -92,17 +111,66 @@ export default function FieldOrders() {
   const [foTypeFilter, setFoTypeFilter] = useState('All')
   const [batchFilter, setBatchFilter] = useState('All')
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [confirm, setConfirm] = useState(null)
   const [editRow, setEditRow] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const navigate = useNavigate()
+  const [selectedRows,setSelectedRows]=useState([])
+  const [selectAllPages, setSelectAllPages] = useState(false)
+  const [repeatCount,setRepeatCount] = useState(1)
+
+function deleteSelected() {
+  const count = selectAllPages ? total : selectedRows.length
+  setConfirm({
+    message: `Delete ${count.toLocaleString()} record${count > 1 ? 's' : ''}? This cannot be undone.`,
+    onConfirm: async () => {
+      if (selectAllPages) {
+        let q = supabase.from('field_orders').delete()
+        const hasFilters = search || statusFilter !== 'All' || foTypeFilter !== 'All' || batchFilter !== 'All'
+        if (!hasFilters) {
+          q = q.neq('id', '00000000-0000-0000-0000-000000000000')
+        } else {
+          if (search) q = q.or(`field_order_no.ilike.%${search}%,service_number.ilike.%${search}%,crew_name.ilike.%${search}%,location.ilike.%${search}%,remove_meter.ilike.%${search}%,ins_meter.ilike.%${search}%`)
+          if (statusFilter !== 'All') q = statusFilter === 'FIELD COMPL.' ? q.ilike('status_crew', '%FIELD%') : q.ilike('status_crew', statusFilter)
+          if (foTypeFilter !== 'All') q = q.ilike('fo_type', foTypeFilter)
+          if (batchFilter === 'ALREADY BATCH') q = q.ilike('for_batch', '%ALREADY%')
+        }
+        await q
+      } else {
+        await supabase.from('field_orders').delete().in('id', selectedRows)
+      }
+      setSelectedRows([])
+      setSelectAllPages(false)
+      fetchRecords()
+      setConfirm(null)
+    }
+  })
+}
+function toggleRow(id){
+
+setSelectedRows(prev=>
+
+prev.includes(id)
+
+?
+prev.filter(x=>x!==id)
+
+:
+
+[...prev,id]
+
+)
+
+}
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
     let q = supabase
       .from('field_orders')
       .select('*', { count: 'exact' })
+      .order('seq', { ascending: true, nullsFirst: true })
       .order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
@@ -126,13 +194,23 @@ export default function FieldOrders() {
     setLoading(false)
   }, [page, search, statusFilter, foTypeFilter, batchFilter])
 
-  useEffect(() => { fetchRecords() }, [fetchRecords])
-  useEffect(() => { setPage(0) }, [search, statusFilter, foTypeFilter, batchFilter])
+useEffect(() => { 
+  fetchRecords() 
+}, [fetchRecords])
+
+
+useEffect(() => {
+  setPage(0)
+  setSelectAllPages(false)
+  setSelectedRows([])
+}, [search, statusFilter, foTypeFilter, batchFilter])
+
 
   function openEdit(row) {
     setEditRow(row)
     const f = { ...EMPTY_FORM }
     for (const k of Object.keys(EMPTY_FORM)) f[k] = row[k] ?? EMPTY_FORM[k]
+    if (f.status_crew?.toUpperCase().includes('FIELD')) f.status_crew = 'FIELD COMPL.'
     setEditForm(f)
     setSaveError('')
   }
@@ -142,21 +220,63 @@ export default function FieldOrders() {
   function sf(field, value) { setEditForm(prev => ({ ...prev, [field]: value })) }
 
   async function handleSave() {
-    setSaving(true); setSaveError('')
-    const payload = {
-      ...editForm,
-      aging: editForm.aging === '' ? null : parseInt(editForm.aging),
-      billed_amount: editForm.billed_amount === '' ? null : parseFloat(editForm.billed_amount),
-      crew_payrol: editForm.crew_payrol === '' ? null : parseFloat(editForm.crew_payrol),
-      date_assign: editForm.date_assign || null,
-      date_executed: editForm.date_executed || null,
-      witness_date: editForm.witness_date || null,
-      date_returned: editForm.date_returned || null,
-    }
-    const { error } = await supabase.from('field_orders').update(payload).eq('id', editRow.id)
-    setSaving(false)
-    if (error) { setSaveError(error.message) } else { closeEdit(); fetchRecords() }
+
+  setSaving(true)
+  setSaveError('')
+
+
+  const payload = {
+
+    ...editForm,
+
+    aging: editForm.aging === ''
+      ? null
+      : parseInt(editForm.aging),
+
+    billed_amount: editForm.billed_amount === ''
+      ? null
+      : parseFloat(editForm.billed_amount),
+
+    crew_payrol: editForm.crew_payrol === ''
+      ? null
+      : parseFloat(editForm.crew_payrol),
+
+    date_assign: editForm.date_assign || null,
+
+    date_executed: editForm.date_executed || null,
+
+    witness_date: editForm.witness_date || null,
+
+    date_returned: editForm.date_returned || null,
+
   }
+
+
+
+  const { error } = await supabase.from('field_orders').update(payload).eq('id', editRow.id)
+
+
+
+
+
+  setSaving(false)
+
+
+
+  if(error){
+
+    setSaveError(error.message)
+
+  }
+  else{
+
+    closeEdit()
+
+    fetchRecords()
+
+  }
+
+}
 
   async function handleDelete(id) {
     const { error } = await supabase.from('field_orders').delete().eq('id', id)
@@ -164,6 +284,90 @@ export default function FieldOrders() {
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
+
+  const [exporting, setExporting] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+
+  const EXPORT_FIELDS = [
+    { key: 'status_crew',           label: 'Status Crew' },
+    { key: 'date_assign',           label: 'Date Assign' },
+    { key: 'for_check',             label: 'For Check' },
+    { key: 'date_executed',         label: 'For Checking (Date)' },
+    { key: 'type_of_meter',         label: 'Type of Meter' },
+    { key: 'job_description',       label: 'Job Description' },
+    { key: 'crew_name',             label: 'Crew Name' },
+    { key: 'location',              label: 'Location' },
+    { key: 'service_number',        label: 'Service Number' },
+    { key: 'field_order_no',        label: 'Field Order/FO' },
+    { key: 'remove_meter',          label: 'Remove Meter' },
+    { key: 'r_serial_number',       label: 'R. Serial Number' },
+    { key: 'demand_seal_aerolock',  label: 'Demand Seal No.5' },
+    { key: 'removed_seal',          label: 'Removed Seal' },
+    { key: 'cabinet_seal_remove',   label: 'Cabinet Seal (2)' },
+    { key: 'reading_kwh',           label: 'Reading (kWh)' },
+    { key: 'demand_kwh_cum',        label: 'DEMAND (kWh)/Cum Demand' },
+    { key: 'ins_meter',             label: 'INS. Meter' },
+    { key: 'ins_serial_number',     label: 'Serial Number' },
+    { key: 'demand_seal_installed', label: 'Demand Seal (5)' },
+    { key: 'installed_seal',        label: 'Installed Seal (1)' },
+    { key: 'cabinet_seal_installed',label: 'Cabinet Seal (2)' },
+    { key: 'tln_tag',               label: 'TLN Tag' },
+    { key: 'pole_tag',              label: 'Pole Tag' },
+    { key: 'booba_number',          label: 'Booba Number' },
+    { key: 'mdltr_no',              label: 'MDLTR No.' },
+    { key: 'aging',                 label: 'Aging' },
+    { key: 'witness_date',          label: 'Witness Date' },
+    { key: 'remarks',               label: 'Remarks' },
+    { key: 'mflt_checklist',        label: 'MFLT Checklist' },
+    { key: 'fo_type',               label: 'FO Type' },
+    { key: 'billed_amount',         label: 'Billed Amount' },
+    { key: 'for_batch',             label: 'For Batch' },
+    { key: 'date_returned',         label: 'Date Returned' },
+    { key: 'crew_payrol',           label: 'Crew Payroll' },
+    { key: 'percentage',            label: '%' },
+    { key: 'pluscode',              label: 'Pluscode' },
+  ]
+
+  async function exportCSV() {
+    setExporting(true)
+    const BATCH = 1000
+    let allData = [], from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('field_orders')
+        .select('*')
+        .order('seq', { ascending: true, nullsFirst: true })
+        .order('created_at', { ascending: false })
+        .range(from, from + BATCH - 1)
+      if (error || !data || data.length === 0) break
+      allData = allData.concat(data)
+      if (data.length < BATCH) break
+      from += BATCH
+    }
+    setExporting(false)
+    const data = allData
+    if (!data || data.length === 0) return
+
+    function esc(val) {
+      if (val === null || val === undefined) return ''
+      const s = String(val)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const header = EXPORT_FIELDS.map(f => f.label).join(',')
+    const rows = data.map(row => EXPORT_FIELDS.map(f => esc(row[f.key])).join(','))
+    const csv = '﻿' + [header, ...rows].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `field_orders_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }} className="gap-4">
@@ -173,12 +377,81 @@ export default function FieldOrders() {
           <h1 className="text-2xl font-bold text-slate-800">Field Orders</h1>
           <p className="text-slate-500 text-sm mt-0.5">{total.toLocaleString()} total records</p>
         </div>
-        <button
-          onClick={() => navigate('/field-orders/add')}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} /> Add Record
-        </button>
+        <div className="flex items-center gap-3">
+
+  <button
+    onClick={() => setShowImport(true)}
+    className="flex items-center gap-2 border border-slate-200 hover:bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+  >
+    <Upload size={15} />
+    Import
+  </button>
+
+  <button
+    onClick={exportCSV}
+    disabled={exporting}
+    className="flex items-center gap-2 border border-slate-200 hover:bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+  >
+    <Download size={15} />
+    {exporting ? 'Exporting…' : 'Export'}
+  </button>
+
+  <input
+    type="number"
+    min="1"
+    value={repeatCount}
+    onChange={
+      e => setRepeatCount(Number(e.target.value))
+    }
+    className="
+      px-3
+      py-2
+      border
+      border-slate-200
+      rounded-lg
+      w-24
+      text-sm
+      focus:outline-none
+      focus:ring-2
+      focus:ring-blue-500
+    "
+    placeholder="Qty"
+  />
+
+
+<button
+  onClick={() =>
+    navigate('/field-orders/add',{
+      state:{
+        repeatCount,
+        currentRepeat:1
+      }
+    })
+  }
+  className="
+    flex
+    items-center
+    gap-2
+    bg-blue-600
+    hover:bg-blue-700
+    text-white
+    px-4
+    py-2
+    rounded-lg
+    text-sm
+    font-medium
+    transition-colors
+  "
+>
+
+<Plus size={16}/>
+
+Add Record
+
+</button>
+
+
+</div>
       </div>
 
       {/* Filters */}
@@ -206,13 +479,95 @@ export default function FieldOrders() {
         </div>
       </div>
 
+
+      {/* Selection Banner */}
+      {selectedRows.length > 0 && (
+        <div className={`shrink-0 flex items-center justify-between px-4 py-2.5 rounded-lg transition-colors ${selectAllPages ? 'bg-blue-600' : 'bg-blue-50 border border-blue-200'}`}>
+          <div className="flex items-center gap-3">
+            {selectAllPages ? (
+              <span className="text-sm font-medium text-white">All {total.toLocaleString()} records are selected.</span>
+            ) : (
+              <>
+                <span className="text-sm text-blue-700">{selectedRows.length} record{selectedRows.length > 1 ? 's' : ''} selected on this page.</span>
+                {selectedRows.length === records.length && total > records.length && (
+                  <button
+                    onClick={() => setSelectAllPages(true)}
+                    className="text-sm text-blue-700 font-semibold underline underline-offset-2 hover:text-blue-900"
+                  >
+                    Select all {total.toLocaleString()} records
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {selectAllPages && (
+              <button
+                onClick={() => { setSelectAllPages(false); setSelectedRows([]) }}
+                className="text-xs text-blue-100 hover:text-white underline underline-offset-2"
+              >
+                Clear selection
+              </button>
+            )}
+            <button
+              onClick={deleteSelected}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${selectAllPages ? 'bg-white text-red-600 hover:bg-red-50' : 'bg-red-600 text-white hover:bg-red-700'}`}
+            >
+              Delete {(selectAllPages ? total : selectedRows.length).toLocaleString()} records
+            </button>
+          </div>
+        </div>
+      )}
       {/* Spreadsheet */}
       <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-auto">
           <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%' }}>
             <thead className="sticky top-0 z-10">
               <tr style={{ background: '#1e293b' }}>
-                <th style={{ width: 40, minWidth: 40, background: '#1e293b' }} className="sticky left-0 z-20 px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700">#</th>
+                <th
+style={{ width:40, minWidth:40, background:'#1e293b' }}
+className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
+>
+<input
+
+type="checkbox"
+
+checked={
+selectedRows.length === records.length &&
+records.length > 0
+}
+
+onChange={(e)=>{
+
+
+if(e.target.checked){
+
+
+setSelectedRows(
+records.map(row=>row.id)
+)
+
+
+}
+else{
+
+
+setSelectedRows([])
+
+
+}
+
+
+}}
+
+/>
+</th>
+                <th
+                  style={{ width: 40, minWidth: 40, background: '#1e293b' }}
+                  className="px-2 py-2.5 text-center font-medium text-slate-400 border-r border-slate-700"
+                >
+                  #
+                </th>
                 {COLS.map(col => (
                   <th
                     key={col.key}
@@ -242,11 +597,19 @@ export default function FieldOrders() {
                   const sel = editRow?.id === row.id
                   return (
                     <tr
-                      key={row.id}
-                      onClick={() => sel ? closeEdit() : openEdit(row)}
-                      style={{ background: sel ? '#eff6ff' : undefined }}
-                      className={`cursor-pointer border-b border-slate-100 transition-colors group ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : 'hover:bg-slate-50'}`}
-                    >
+  key={row.id}
+  onClick={() => sel ? closeEdit() : openEdit(row)}
+  style={{ background: sel ? '#eff6ff' : undefined }}
+  className={`cursor-pointer border-b border-slate-100 transition-colors group ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : 'hover:bg-slate-50'}`}
+>
+  <td className="px-2 py-2 text-center">
+  <input
+  type="checkbox"
+  checked={selectedRows.includes(row.id)}
+  onClick={(e) => e.stopPropagation()}
+  onChange={() => toggleRow(row.id)}
+/>
+</td>
                       <td
                         style={{ width: 40, minWidth: 40, background: sel ? '#eff6ff' : 'white' }}
                         className="sticky left-0 z-[5] px-2 py-2 text-center text-slate-400 border-r border-slate-100 group-hover:bg-slate-50"
@@ -278,7 +641,21 @@ export default function FieldOrders() {
               <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 <ChevronLeft size={16} />
               </button>
-              <span className="px-2 text-xs">Page {page + 1} of {totalPages}</span>
+              <span className="px-2 text-xs flex items-center gap-1">
+                Page
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={page + 1}
+                  onChange={e => {
+                    const v = parseInt(e.target.value)
+                    if (!isNaN(v) && v >= 1 && v <= totalPages) setPage(v - 1)
+                  }}
+                  className="w-14 px-1.5 py-0.5 border border-slate-300 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                of {totalPages}
+              </span>
               <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 <ChevronRight size={16} />
               </button>
@@ -389,6 +766,9 @@ export default function FieldOrders() {
                 <PF label="Reading (kWh)">
                   <input value={editForm.reading_kwh} onChange={e => sf('reading_kwh', e.target.value)} className={iCls} />
                 </PF>
+                <PF label="DEMAND (kWh)/Cum Demand">
+                  <input value={editForm.demand_kwh_cum} onChange={e => sf('demand_kwh_cum', e.target.value)} className={iCls} />
+                </PF>
               </PS>
 
               <PS title="New Installed Meter">
@@ -470,16 +850,52 @@ export default function FieldOrders() {
               </PS>
 
               <div className="pt-1 border-t border-slate-100">
-                <button
-                  onClick={() => { closeEdit(); setDeleteTarget(editRow) }}
-                  className="w-full px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Delete this record
-                </button>
-              </div>
+
+<button
+
+onClick={() => { closeEdit(); setDeleteTarget(editRow) }}
+
+className="
+w-full
+px-4
+py-2
+border
+border-red-200
+text-red-600
+hover:bg-red-50
+rounded-lg
+text-sm
+font-medium
+"
+
+>
+
+Delete this record
+
+</button>
+
+</div>
             </div>
           </div>
         </>
+      )}
+
+      {/* Confirm Modal */}
+      {confirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-bold text-slate-800 text-lg">Are you sure?</h3>
+            <p className="text-slate-500 text-sm mt-2">{confirm.message}</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setConfirm(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={confirm.onConfirm} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+                Yes, delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Modal */}
@@ -500,6 +916,13 @@ export default function FieldOrders() {
             </div>
           </div>
         </div>
+      )}
+
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { fetchRecords(); setShowImport(false) }}
+        />
       )}
     </div>
   )

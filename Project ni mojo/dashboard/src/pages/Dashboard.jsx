@@ -31,7 +31,8 @@ export default function Dashboard() {
     async function fetchData() {
       const { data, error } = await supabase
         .from('field_orders')
-        .select('status_crew, fo_type, for_batch, billed_amount, crew_name, field_order_no, location, created_at')
+        .select('status_crew, fo_type, for_batch, billed_amount, crew_name, field_order_no, location, created_at, seq')
+        .order('seq', { ascending: true, nullsFirst: true })
         .order('created_at', { ascending: false })
 
       if (error) {

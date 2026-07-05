@@ -9,23 +9,26 @@ export default function Login(){
     const [email,setEmail] = useState("");
     const [password,setPassword] = useState("");
     const [loading,setLoading] = useState(false);
+    const [error,setError] = useState("");
 
     const navigate = useNavigate();
 
 
-    async function handleLogin(){
+    async function handleLogin(e){
 
+        e.preventDefault();
+        setError("");
         setLoading(true);
 
-        const {error} = await supabase.auth.signInWithPassword({
+        const { error: authError } = await supabase.auth.signInWithPassword({
             email,
             password
         });
 
 
-        if(error){
+        if(authError){
 
-            alert(error.message);
+            setError("Invalid email or password.");
 
         }else{
 
@@ -73,7 +76,13 @@ export default function Login(){
 
 
 
-                    <div className="space-y-4">
+                    <form onSubmit={handleLogin} className="space-y-4">
+
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+                            {error}
+                        </div>
+                    )}
 
 
                         <div>
@@ -138,7 +147,7 @@ export default function Login(){
 
                         <button
 
-                        onClick={handleLogin}
+                        type="submit"
 
                         disabled={loading}
 
@@ -168,7 +177,7 @@ export default function Login(){
                         </button>
 
 
-                    </div>
+                    </form>
 
 
                 </div>
