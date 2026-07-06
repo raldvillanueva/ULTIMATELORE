@@ -66,9 +66,8 @@ const COLS = [
   { label: 'TYPE OF METER',       key: 'type_of_meter',         w: 130, render: r => r.type_of_meter || '—' },
   { label: 'JOB DESCRIPTION',     key: 'job_description',       w: 120, render: r => r.job_description || '—' },
   { label: 'CREW NAME',           key: 'crew_name',             w: 130, render: r => r.crew_name || '—' },
-  { label: 'LOCATION',            key: 'location',              w: 260, render: r => r.location || '—' },
-  { label: 'SERVICE NUMBER',      key: 'service_number',        w: 135, render: r => r.service_number || '—' },
   { label: 'FIELD ORDER/FO',      key: 'field_order_no',        w: 145, mono: true, render: r => r.field_order_no || '—' },
+  { label: 'SERVICE NUMBER',      key: 'service_number',        w: 135, render: r => r.service_number || '—' },
   // — REMOVE METER —
   { label: 'REMOVE METER',        key: 'remove_meter',          w: 130, render: r => r.remove_meter || '—' },
   { label: 'R. SERIAL NUMBER',    key: 'r_serial_number',       w: 130, render: r => r.r_serial_number || '—' },
@@ -91,6 +90,7 @@ const COLS = [
   { label: 'AGING',               key: 'aging',                 w: 70,  render: r => r.aging != null ? r.aging : '—' },
   { label: 'WITNESS DATE',        key: 'witness_date',          w: 115, render: r => r.witness_date || '—' },
   { label: 'REMARKS',             key: 'remarks',               w: 200, render: r => r.remarks || '—' },
+  { label: 'LOCATION',            key: 'location',              w: 260, render: r => r.location || '—' },
   { label: 'MFLT CHECKLIST',      key: 'mflt_checklist',        w: 110, render: r => r.mflt_checklist ? <span className="text-emerald-600 font-bold">✓</span> : '' },
   { label: 'FO TYPE',             key: 'fo_type',               w: 90,  render: r => <FoTypeBadge type={r.fo_type} /> },
   { label: 'BILLED AMOUNT',       key: 'billed_amount',         w: 110, render: r => r.billed_amount != null ? `₱${parseFloat(r.billed_amount).toFixed(2)}` : '—' },

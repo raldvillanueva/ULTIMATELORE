@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
 import FieldOrders from './pages/FieldOrders'
 import PendingRecords from './pages/PendingRecords'
 import AddRecord from './pages/AddRecord'
@@ -21,7 +20,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="dashboard" element={<Dashboard />} />
+
           <Route path="field-orders" element={<FieldOrders />} />
           <Route path="field-orders/add" element={<AddRecord />} />
           <Route path="field-orders/edit/:id" element={<EditRecord />} />

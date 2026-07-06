@@ -2,7 +2,7 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
-
+import logo from "../assets/mb-logo.jpg";
 
 export default function Login(){
 
@@ -32,7 +32,7 @@ export default function Login(){
 
         }else{
 
-            navigate("/dashboard");
+            navigate("/field-orders");
 
         }
 
@@ -43,7 +43,7 @@ export default function Login(){
 
     return (
 
-        <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="min-h-screen bg-[#F4F4F4] flex items-center justify-center">
 
 
             <div className="w-full max-w-md">
@@ -51,23 +51,29 @@ export default function Login(){
 
                 {/* Logo / Title */}
 
-                <div className="text-center mb-8">
+                <div className="text-center mb-8 flex flex-col items-center">
 
-                    <h1 className="text-3xl font-bold text-slate-800">
-                        Field Order System
-                    </h1>
+<img
+    src={logo}
+    alt="MB Development Corporation"
+    className="w-36 h-36 object-contain drop-shadow-lg mb-2"
+/>
 
-                    <p className="text-slate-500 mt-2">
-                        Login to access your dashboard
-                    </p>
+  <h1 className="text-3xl font-bold text-[#2E2E2E]">
+    MB Development Corporation
+  </h1>
 
-                </div>
+  <p className="text-[#6D6D6D] mt-2">
+    Field Order Management System
+  </p>
+
+</div>
 
 
 
                 {/* Login Card */}
 
-                <div className="bg-white rounded-xl shadow-lg p-8 border border-slate-200">
+                <div className="bg-white rounded-2xl shadow-xl p-8 border border-[#D9D9D9]">
 
 
                     <h2 className="text-xl font-semibold text-slate-800 mb-6">
@@ -102,7 +108,7 @@ export default function Login(){
                             rounded-lg
                             focus:outline-none
                             focus:ring-2
-                            focus:ring-blue-500
+                            focus:ring-[#D89B00]
                             "
 
                             placeholder="Enter your email"
@@ -132,7 +138,7 @@ export default function Login(){
                             rounded-lg
                             focus:outline-none
                             focus:ring-2
-                            focus:ring-blue-500
+                            focus:ring-[#D89B00]
                             "
 
                             placeholder="Enter your password"
@@ -151,12 +157,7 @@ export default function Login(){
 
                         disabled={loading}
 
-                        className="
-                        w-full
-                        bg-blue-600
-                        hover:bg-blue-700
-                        text-white
-                        py-3
+                        className="w-full bg-[#D89B00] hover:bg-[#C58A00] text-white py-3 
                         rounded-lg
                         flex
                         items-center
