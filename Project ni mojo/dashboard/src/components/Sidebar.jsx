@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { ClipboardList, Clock } from 'lucide-react'
-import logo from '../assets/mb-logo.jpg'
+import { LayoutDashboard, ClipboardList, Zap, Clock } from 'lucide-react'
 
 const navItems = [
   
   { to: '/field-orders', icon: ClipboardList, label: 'Field Orders' },
   { to: '/pending-records', icon: Clock, label: 'Pending Records' },
+  { to: '/new-work-orders', icon: ClipboardList, label: 'New Work Orders' },
+  { to: '/archived-work-orders', icon: Archive, label: 'Archived Work Orders' },
 ]
 
 export default function Sidebar() {

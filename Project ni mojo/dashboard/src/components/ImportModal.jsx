@@ -37,7 +37,6 @@ const DB_FIELDS = [
   { key: 'for_batch',             label: 'For Batch' },
   { key: 'date_returned',         label: 'Date Returned' },
   { key: 'crew_payrol',           label: 'Crew Payrol' },
-  { key: 'percentage',            label: 'Percentage' },
   { key: 'pluscode',              label: 'Plus Code' },
 ]
 
@@ -51,7 +50,7 @@ const ALIASES = {
   status_crew:           ['status crew', 'status', 'crew status', 'status_crew'],
   date_assign:           ['date assign', 'date assigned', 'assign date', 'date_assign'],
   for_check:             ['for checking', 'for check', 'chk', 'checked', 'for_check'],
-  date_executed:         ['for checking (2)', 'date exec', 'date executed', 'execution date', 'date_executed'],
+  date_executed:         ['for checking (2)', 'date exec', 'date executed', 'date executed', 'execution date', 'date_executed', 'for checking (date)'],
   type_of_meter:         ['type of meter', 'meter type', 'type_of_meter'],
   job_description:       ['job description', 'job desc', 'description', 'job_description'],
   crew_name:             ['crew name', 'crew', 'assigned crew', 'crew_name'],
@@ -83,7 +82,6 @@ const ALIASES = {
   for_batch:             ['for batch', 'batch', 'batch status', 'for_batch'],
   date_returned:         ['date returned', 'return date', 'date_returned'],
   crew_payrol:           ['crew payroll', 'crew payrol', 'payroll', 'crew_payrol'],
-  percentage:            ['%', 'percentage', 'percent'],
   pluscode:              ['pluscode', 'plus code', 'plus_code'],
 }
 

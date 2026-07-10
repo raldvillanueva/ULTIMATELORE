@@ -1,14 +1,18 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Plus, Search, ChevronLeft, ChevronRight, X, Save, Download, Upload } from 'lucide-react'
+import { Plus, Search, ChevronLeft, ChevronRight, X, Save, Download, Upload, Archive } from 'lucide-react'
 import ImportModal from '../components/ImportModal'
 
 const PAGE_SIZE = 50
 
-const STATUS_OPTIONS = ['All', 'FIELD COMPL.', 'CANCEL']
-const FO_TYPE_OPTIONS = ['All', 'REPLACE', 'RETIRE', 'REMOVE', 'CANCEL']
-const BATCH_OPTIONS = ['All', 'ALREADY BATCH', 'NOT BATCHED']
+const STATUS_OPTIONS = ['All', 'FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
+const TYPE_OF_METER_OPTIONS = ['All', '12S', '12S ID METER', '1S', '1S EMC L-G', '25S', '2S EMC L-G', '2S EMC L-L', '2S EMX', '2S ID', '2S ID METER', '2S ID METER/ERC', '2S PLAIN METER', '9S', 'EMX', 'ERC 2S PLAIN METER', 'FOR REPLACE', 'KLOAD', 'RETURNED']
+const JOB_DESCRIPTION_OPTIONS = ['All', 'REPLACE', 'REPLACE-EMC', 'REPLACE-EMX', 'RETIRE', 'RETIRE-EMC', 'RETIRE-EMC-WIRE']
+const CREW_NAME_OPTIONS = ['All', 'A. TOMADA', 'B. VERDARERO', 'C. BENIGNO', 'D. FABOL', 'E. VILLAREAL', 'J. BITAGO', 'J. J. SERRANO']
+const FO_TYPE_OPTIONS = ['All', 'CANCEL', 'CANCEL-EMC', 'CUT SERVICE ENTRANCE', 'ENERGIZED', 'REMOVE', 'REMOVE-EMC', 'REMOVE-EMC-WIRE', 'REPLACE', 'REPLACE-EMC', 'REPLACE-EMX']
+const BILLED_AMOUNT_OPTIONS = ['All', '0', '172.45', '253.43', '344.9', '383.22', '574.83', '766.44', '958.05', '1013.71', '1689.61']
+const BATCH_OPTIONS = ['All', 'ALREADY BATCH', 'FOR BATCH', 'MISSING METER', 'OTHERS PENDING']
 
 const EMPTY_FORM = {
   status_crew: '', date_assign: '', for_check: false, date_executed: '', type_of_meter: '',
@@ -62,7 +66,7 @@ const COLS = [
   { label: 'STATUS CREW',         key: 'status_crew',           w: 120, render: r => <StatusBadge status={r.status_crew} /> },
   { label: 'DATE ASSIGN',         key: 'date_assign',           w: 105, render: r => r.date_assign || '—' },
   { label: 'FOR CHECK',           key: 'for_check',             w: 80,  render: r => r.for_check ? <span className="text-emerald-600 font-bold">✓</span> : '' },
-  { label: 'FOR CHECKING (DATE)', key: 'date_executed',         w: 140, render: r => r.date_executed || '—' },
+  { label: 'DATE EXECUTED',       key: 'date_executed',         w: 140, render: r => r.date_executed || '—' },
   { label: 'TYPE OF METER',       key: 'type_of_meter',         w: 130, render: r => r.type_of_meter || '—' },
   { label: 'JOB DESCRIPTION',     key: 'job_description',       w: 120, render: r => r.job_description || '—' },
   { label: 'CREW NAME',           key: 'crew_name',             w: 130, render: r => r.crew_name || '—' },
@@ -97,7 +101,6 @@ const COLS = [
   { label: 'FOR BATCH',           key: 'for_batch',             w: 100, render: r => r.for_batch?.toUpperCase().includes('ALREADY') ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">Batched</span> : <span className="text-slate-300">—</span> },
   { label: 'DATE RETURNED',       key: 'date_returned',         w: 115, render: r => r.date_returned || '—' },
   { label: 'CREW PAYROLL',        key: 'crew_payrol',           w: 110, render: r => r.crew_payrol != null ? `₱${r.crew_payrol}` : '—' },
-  { label: '%',                   key: 'percentage',            w: 60,  render: r => r.percentage || '—' },
   { label: 'PLUSCODE',            key: 'pluscode',              w: 90,  render: r => r.pluscode || '—' },
 ]
 
@@ -108,8 +111,15 @@ export default function FieldOrders() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [typeOfMeterFilter, setTypeOfMeterFilter] = useState('All')
+  const [jobDescriptionFilter, setJobDescriptionFilter] = useState('All')
+  const [crewNameFilter, setCrewNameFilter] = useState('All')
   const [foTypeFilter, setFoTypeFilter] = useState('All')
+  const [billedAmountFilter, setBilledAmountFilter] = useState('All')
   const [batchFilter, setBatchFilter] = useState('All')
+  const [dateExecutedFilter, setDateExecutedFilter] = useState('')
+  const [openFilterKey, setOpenFilterKey] = useState(null)
+  const [filterPos, setFilterPos] = useState({ x: 0, y: 0 })
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [confirm, setConfirm] = useState(null)
   const [editRow, setEditRow] = useState(null)
@@ -127,15 +137,20 @@ function deleteSelected() {
     message: `Delete ${count.toLocaleString()} record${count > 1 ? 's' : ''}? This cannot be undone.`,
     onConfirm: async () => {
       if (selectAllPages) {
-        let q = supabase.from('field_orders').delete()
-        const hasFilters = search || statusFilter !== 'All' || foTypeFilter !== 'All' || batchFilter !== 'All'
+        let q = supabase.from('field_orders').delete().is('archived_at', null)
+        const hasFilters = search || statusFilter !== 'All' || typeOfMeterFilter !== 'All' || jobDescriptionFilter !== 'All' || crewNameFilter !== 'All' || foTypeFilter !== 'All' || billedAmountFilter !== 'All' || batchFilter !== 'All' || dateExecutedFilter
         if (!hasFilters) {
           q = q.neq('id', '00000000-0000-0000-0000-000000000000')
         } else {
           if (search) q = q.or(`field_order_no.ilike.%${search}%,service_number.ilike.%${search}%,crew_name.ilike.%${search}%,location.ilike.%${search}%,remove_meter.ilike.%${search}%,ins_meter.ilike.%${search}%`)
-          if (statusFilter !== 'All') q = statusFilter === 'FIELD COMPL.' ? q.ilike('status_crew', '%FIELD%') : q.ilike('status_crew', statusFilter)
+          if (statusFilter !== 'All') q = statusFilter === 'FIELD COMPLETED' ? q.ilike('status_crew', '%FIELD%') : q.ilike('status_crew', statusFilter)
+          if (typeOfMeterFilter !== 'All') q = q.ilike('type_of_meter', typeOfMeterFilter)
+          if (jobDescriptionFilter !== 'All') q = q.ilike('job_description', jobDescriptionFilter)
+          if (crewNameFilter !== 'All') q = q.ilike('crew_name', crewNameFilter)
           if (foTypeFilter !== 'All') q = q.ilike('fo_type', foTypeFilter)
-          if (batchFilter === 'ALREADY BATCH') q = q.ilike('for_batch', '%ALREADY%')
+          if (billedAmountFilter !== 'All') q = q.eq('billed_amount', parseFloat(billedAmountFilter))
+          if (batchFilter !== 'All') q = q.ilike('for_batch', batchFilter)
+          if (dateExecutedFilter) q = q.eq('date_executed', dateExecutedFilter)
         }
         await q
       } else {
@@ -180,19 +195,20 @@ prev.filter(x=>x!==id)
       )
     }
     if (statusFilter !== 'All') {
-      q = statusFilter === 'FIELD COMPL.' ? q.ilike('status_crew', '%FIELD%') : q.ilike('status_crew', statusFilter)
+      q = statusFilter === 'FIELD COMPLETED' ? q.ilike('status_crew', '%FIELD%') : q.ilike('status_crew', statusFilter)
     }
+    if (typeOfMeterFilter !== 'All') q = q.ilike('type_of_meter', typeOfMeterFilter)
+    if (jobDescriptionFilter !== 'All') q = q.ilike('job_description', jobDescriptionFilter)
+    if (crewNameFilter !== 'All') q = q.ilike('crew_name', crewNameFilter)
     if (foTypeFilter !== 'All') q = q.ilike('fo_type', foTypeFilter)
-    if (batchFilter === 'ALREADY BATCH') {
-      q = q.ilike('for_batch', '%ALREADY%')
-    } else if (batchFilter === 'NOT BATCHED') {
-      q = q.is('for_batch', null).or('for_batch.not.ilike.%ALREADY%', { referencedTable: 'field_orders' })
-    }
+    if (billedAmountFilter !== 'All') q = q.eq('billed_amount', parseFloat(billedAmountFilter))
+    if (batchFilter !== 'All') q = q.ilike('for_batch', batchFilter)
+    if (dateExecutedFilter) q = q.eq('date_executed', dateExecutedFilter)
 
     const { data, count, error } = await q
     if (!error) { setRecords(data); setTotal(count) }
     setLoading(false)
-  }, [page, search, statusFilter, foTypeFilter, batchFilter])
+  }, [page, search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter])
 
 useEffect(() => { 
   fetchRecords() 
@@ -203,8 +219,24 @@ useEffect(() => {
   setPage(0)
   setSelectAllPages(false)
   setSelectedRows([])
-}, [search, statusFilter, foTypeFilter, batchFilter])
+}, [search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter])
 
+
+  function toggleFilter(key, e) {
+    if (openFilterKey === key) { setOpenFilterKey(null); return }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setFilterPos({ x: rect.left, y: rect.bottom + 4 })
+    setOpenFilterKey(key)
+  }
+
+  useEffect(() => {
+    if (!openFilterKey) return
+    function handler(e) {
+      if (!e.target.closest('[data-filter-dropdown]')) setOpenFilterKey(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openFilterKey])
 
   function openEdit(row) {
     setEditRow(row)
@@ -281,6 +313,22 @@ useEffect(() => {
   async function handleDelete(id) {
     const { error } = await supabase.from('field_orders').delete().eq('id', id)
     if (!error) { setDeleteTarget(null); fetchRecords() }
+  }
+
+  async function archiveRecord() {
+    setSaving(true)
+    setSaveError('')
+    const { error } = await supabase
+      .from('field_orders')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', editRow.id)
+    setSaving(false)
+    if (error) {
+      setSaveError('We could not archive this work order. Please try again.')
+      return
+    }
+    closeEdit()
+    fetchRecords()
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -369,6 +417,51 @@ useEffect(() => {
     URL.revokeObjectURL(url)
   }
 
+  const [exportingSelected, setExportingSelected] = useState(false)
+
+  async function exportSelected() {
+    if (selectedRows.length === 0) return
+    setExportingSelected(true)
+    const { data, error } = await supabase
+      .from('field_orders')
+      .select('*')
+      .in('id', selectedRows)
+      .order('seq', { ascending: true, nullsFirst: true })
+      .order('created_at', { ascending: false })
+    setExportingSelected(false)
+    if (error || !data || data.length === 0) return
+
+    function esc(val) {
+      if (val === null || val === undefined) return ''
+      const s = String(val)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const header = EXPORT_FIELDS.map(f => f.label).join(',')
+    const rows = data.map(row => EXPORT_FIELDS.map(f => esc(row[f.key])).join(','))
+    const csv = '﻿' + [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `field_orders_selected_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const COL_FILTER_KEYS = {
+    status_crew:    { options: STATUS_OPTIONS,        value: statusFilter,        set: setStatusFilter,        isActive: () => statusFilter !== 'All' },
+    date_executed:  { type: 'date',                   value: dateExecutedFilter,  set: setDateExecutedFilter,  isActive: () => !!dateExecutedFilter },
+    type_of_meter:  { options: TYPE_OF_METER_OPTIONS, value: typeOfMeterFilter,   set: setTypeOfMeterFilter,   isActive: () => typeOfMeterFilter !== 'All' },
+    job_description:{ options: JOB_DESCRIPTION_OPTIONS,value: jobDescriptionFilter,set: setJobDescriptionFilter,isActive: () => jobDescriptionFilter !== 'All' },
+    crew_name:      { options: CREW_NAME_OPTIONS,     value: crewNameFilter,      set: setCrewNameFilter,      isActive: () => crewNameFilter !== 'All' },
+    fo_type:        { options: FO_TYPE_OPTIONS,       value: foTypeFilter,        set: setFoTypeFilter,        isActive: () => foTypeFilter !== 'All' },
+    billed_amount:  { options: BILLED_AMOUNT_OPTIONS, value: billedAmountFilter,  set: setBilledAmountFilter,  isActive: () => billedAmountFilter !== 'All', formatLabel: o => o === 'All' ? 'All' : `₱${o}` },
+    for_batch:      { options: BATCH_OPTIONS,         value: batchFilter,         set: setBatchFilter,         isActive: () => batchFilter !== 'All' },
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }} className="gap-4">
       {/* Header */}
@@ -454,28 +547,17 @@ Add Record
 </div>
       </div>
 
-      {/* Filters */}
+      {/* Search */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 shrink-0">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-48">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search FO#, service no, crew, location..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {STATUS_OPTIONS.map(o => <option key={o}>{o}</option>)}
-          </select>
-          <select value={foTypeFilter} onChange={e => setFoTypeFilter(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {FO_TYPE_OPTIONS.map(o => <option key={o}>{o}</option>)}
-          </select>
-          <select value={batchFilter} onChange={e => setBatchFilter(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {BATCH_OPTIONS.map(o => <option key={o}>{o}</option>)}
-          </select>
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search FO#, service no, crew, location..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
 
@@ -488,8 +570,13 @@ Add Record
               <span className="text-sm font-medium text-white">All {total.toLocaleString()} records are selected.</span>
             ) : (
               <>
-                <span className="text-sm text-blue-700">{selectedRows.length} record{selectedRows.length > 1 ? 's' : ''} selected on this page.</span>
-                {selectedRows.length === records.length && total > records.length && (
+                <span className="text-sm text-blue-700">
+                  {selectedRows.length} record{selectedRows.length > 1 ? 's' : ''} selected
+                  {records.some(r => selectedRows.includes(r.id)) && selectedRows.some(id => !records.map(r => r.id).includes(id)) && (
+                    <span className="text-blue-500 ml-1">(across multiple pages)</span>
+                  )}
+                </span>
+                {records.every(r => selectedRows.includes(r.id)) && total > selectedRows.length && (
                   <button
                     onClick={() => setSelectAllPages(true)}
                     className="text-sm text-blue-700 font-semibold underline underline-offset-2 hover:text-blue-900"
@@ -507,6 +594,16 @@ Add Record
                 className="text-xs text-blue-100 hover:text-white underline underline-offset-2"
               >
                 Clear selection
+              </button>
+            )}
+            {!selectAllPages && (
+              <button
+                onClick={exportSelected}
+                disabled={exportingSelected}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+              >
+                <Download size={14} />
+                {exportingSelected ? 'Exporting…' : `Export ${selectedRows.length}`}
               </button>
             )}
             <button
@@ -533,8 +630,8 @@ className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-sl
 type="checkbox"
 
 checked={
-selectedRows.length === records.length &&
-records.length > 0
+records.length > 0 &&
+records.every(r => selectedRows.includes(r.id))
 }
 
 onChange={(e)=>{
@@ -543,16 +640,17 @@ onChange={(e)=>{
 if(e.target.checked){
 
 
-setSelectedRows(
-records.map(row=>row.id)
-)
+setSelectedRows(prev => {
+  const newIds = records.map(r => r.id).filter(id => !prev.includes(id))
+  return [...prev, ...newIds]
+})
 
 
 }
 else{
 
 
-setSelectedRows([])
+setSelectedRows(prev => prev.filter(id => !records.map(r => r.id).includes(id)))
 
 
 }
@@ -568,15 +666,31 @@ setSelectedRows([])
                 >
                   #
                 </th>
-                {COLS.map(col => (
-                  <th
-                    key={col.key}
-                    style={{ minWidth: col.w, maxWidth: col.w, background: '#1e293b' }}
-                    className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap border-r border-slate-700 last:border-0"
-                  >
-                    {col.label}
-                  </th>
-                ))}
+                {COLS.map(col => {
+                  const filterCfg = COL_FILTER_KEYS[col.key]
+                  const isActive = filterCfg && filterCfg.isActive()
+                  return (
+                    <th
+                      key={col.key}
+                      style={{ minWidth: col.w, maxWidth: col.w, background: '#1e293b' }}
+                      className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap border-r border-slate-700 last:border-0"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="flex-1 truncate">{col.label}</span>
+                        {filterCfg && (
+                          <button
+                            data-filter-dropdown
+                            onClick={e => { e.stopPropagation(); toggleFilter(col.key, e) }}
+                            className={`shrink-0 rounded px-0.5 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                            style={{ fontSize: 9, lineHeight: 1 }}
+                          >
+                            {isActive ? '▼' : '▽'}
+                          </button>
+                        )}
+                      </div>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
@@ -677,6 +791,14 @@ setSelectedRows([])
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={archiveRecord}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Archive size={14} />
+                  Archive
+                </button>
+                <button
                   onClick={handleSave}
                   disabled={saving}
                   className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -707,8 +829,14 @@ setSelectedRows([])
                 <PF label="Status Crew">
                   <select value={editForm.status_crew} onChange={e => sf('status_crew', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
+                    <option>FOR ASSIGN</option>
+                    <option>ASSIGNED</option>
                     <option>FIELD COMPL.</option>
                     <option>CANCEL</option>
+                    <option>CANCEL-EMC</option>
+                    <option>FC CANCEL</option>
+                    <option>REVISITED FIELD COM.</option>
+                    <option>REVISITED CANCEL</option>
                   </select>
                 </PF>
                 <PF label="Date Assign">
@@ -720,21 +848,20 @@ setSelectedRows([])
                 <PF label="Type of Meter">
                   <select value={editForm.type_of_meter} onChange={e => sf('type_of_meter', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>2S PLAIN METER</option>
-                    <option>1S PLAIN METER</option>
-                    <option>3S PLAIN METER</option>
+                    {TYPE_OF_METER_OPTIONS.slice(1).map(o => <option key={o}>{o}</option>)}
                   </select>
                 </PF>
                 <PF label="Job Description">
                   <select value={editForm.job_description} onChange={e => sf('job_description', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>REPLACE</option>
-                    <option>RETIRE</option>
-                    <option>REMOVE</option>
+                    {JOB_DESCRIPTION_OPTIONS.slice(1).map(o => <option key={o}>{o}</option>)}
                   </select>
                 </PF>
                 <PF label="Crew Name">
-                  <input value={editForm.crew_name} onChange={e => sf('crew_name', e.target.value)} className={iCls} />
+                  <select value={editForm.crew_name} onChange={e => sf('crew_name', e.target.value)} className={iCls}>
+                    <option value="">— Select —</option>
+                    {CREW_NAME_OPTIONS.slice(1).map(o => <option key={o}>{o}</option>)}
+                  </select>
                 </PF>
                 <PF label="Location" span2>
                   <input value={editForm.location} onChange={e => sf('location', e.target.value)} className={iCls} />
@@ -811,19 +938,19 @@ setSelectedRows([])
                 <PF label="FO Type">
                   <select value={editForm.fo_type} onChange={e => sf('fo_type', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>REPLACE</option>
-                    <option>RETIRE</option>
-                    <option>REMOVE</option>
-                    <option>CANCEL</option>
+                    {FO_TYPE_OPTIONS.slice(1).map(o => <option key={o}>{o}</option>)}
                   </select>
                 </PF>
                 <PF label="Billed Amount (₱)">
-                  <input type="number" step="0.01" value={editForm.billed_amount} onChange={e => sf('billed_amount', e.target.value)} className={iCls} />
+                  <select value={editForm.billed_amount} onChange={e => sf('billed_amount', e.target.value)} className={iCls}>
+                    <option value="">— Select —</option>
+                    {BILLED_AMOUNT_OPTIONS.slice(1).map(option => <option key={option}>{option}</option>)}
+                  </select>
                 </PF>
                 <PF label="For Batch">
                   <select value={editForm.for_batch} onChange={e => sf('for_batch', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>ALREADY BATCH</option>
+                    {BATCH_OPTIONS.slice(1).map(o => <option key={o}>{o}</option>)}
                   </select>
                 </PF>
                 <PF label="Date Returned">
@@ -924,6 +1051,53 @@ Delete this record
           onImported={() => { fetchRecords(); setShowImport(false) }}
         />
       )}
+
+      {/* Column filter dropdown overlay */}
+      {openFilterKey && COL_FILTER_KEYS[openFilterKey] && (() => {
+        const cfg = COL_FILTER_KEYS[openFilterKey]
+        return (
+          <div
+            data-filter-dropdown
+            style={{ position: 'fixed', left: filterPos.x, top: filterPos.y, zIndex: 1000 }}
+            className="bg-white rounded-xl shadow-2xl border border-slate-200 min-w-[180px] max-h-72 overflow-y-auto"
+          >
+            {cfg.type === 'date' ? (
+              <div className="p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Filter by date</p>
+                <input
+                  type="date"
+                  value={cfg.value}
+                  onChange={e => cfg.set(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {cfg.value && (
+                  <button
+                    onClick={() => { cfg.set(''); setOpenFilterKey(null) }}
+                    className="w-full text-xs text-red-500 hover:text-red-700 py-1 text-center"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+            ) : (
+              cfg.options.map(o => {
+                const isSelected = cfg.value === o
+                const label = cfg.formatLabel ? cfg.formatLabel(o) : o
+                return (
+                  <button
+                    key={o}
+                    data-filter-dropdown
+                    onClick={() => { cfg.set(o); setOpenFilterKey(null) }}
+                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${isSelected ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`}
+                  >
+                    {label}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

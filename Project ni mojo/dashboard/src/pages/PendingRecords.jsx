@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { X, Save, CheckCircle, Search } from 'lucide-react'
 
+const STATUS_CREW_OPTIONS = ['FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
+const TYPE_OF_METER_OPTIONS = ['12S', '12S ID METER', '1S', '1S EMC L-G', '25S', '2S EMC L-G', '2S EMC L-L', '2S EMX', '2S ID', '2S ID METER', '2S ID METER/ERC', '2S PLAIN METER', '9S', 'EMX', 'ERC 2S PLAIN METER', 'FOR REPLACE', 'KLOAD', 'RETURNED']
+const JOB_DESCRIPTION_OPTIONS = ['REPLACE', 'REPLACE-EMC', 'REPLACE-EMX', 'RETIRE', 'RETIRE-EMC', 'RETIRE-EMC-WIRE']
+const CREW_NAME_OPTIONS = ['A. TOMADA', 'B. VERDARERO', 'C. BENIGNO', 'D. FABOL', 'E. VILLAREAL', 'J. BITAGO', 'J. J. SERRANO']
+const FO_TYPE_OPTIONS = ['CANCEL', 'CANCEL-EMC', 'CUT SERVICE ENTRANCE', 'ENERGIZED', 'REMOVE', 'REMOVE-EMC', 'REMOVE-EMC-WIRE', 'REPLACE', 'REPLACE-EMC', 'REPLACE-EMX']
+const BILLED_AMOUNT_OPTIONS = ['0', '172.45', '253.43', '344.9', '383.22', '574.83', '766.44', '958.05', '1013.71', '1689.61']
+const BATCH_OPTIONS = ['ALREADY BATCH', 'FOR BATCH', 'MISSING METER', 'OTHERS PENDING']
+
 const EMPTY_FORM = {
   status_crew: '', date_assign: '', for_check: false, date_executed: '', type_of_meter: '',
   job_description: '', crew_name: '', location: '', service_number: '', field_order_no: '',
@@ -10,7 +18,7 @@ const EMPTY_FORM = {
   demand_seal_installed: '', installed_seal: '', cabinet_seal_installed: '', tln_tag: '',
   pole_tag: '', booba_number: '', mdltr_no: '', aging: '', witness_date: '', remarks: '',
   mflt_checklist: false, fo_type: '', billed_amount: '', for_batch: '', date_returned: '',
-  crew_payrol: '', percentage: '', pluscode: '',
+  crew_payrol: '', pluscode: '',
 }
 
 const iCls = 'w-full px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white'
@@ -31,6 +39,22 @@ function PS({ title, children }) {
       <div className="grid grid-cols-2 gap-3">{children}</div>
     </div>
   )
+}
+
+function friendlySaveError(error) {
+  const message = error?.message?.toLowerCase() || ''
+
+  if (message.includes('invalid input syntax') || message.includes('invalid input')) {
+    return 'One or more entries have an invalid format. Please check the values and try again.'
+  }
+  if (message.includes('duplicate') || message.includes('unique')) {
+    return 'This record already exists. Please check the Field Order and Installed Meter numbers.'
+  }
+  if (message.includes('not-null') || message.includes('null value')) {
+    return 'Please complete all required information before saving.'
+  }
+
+  return 'We could not save your changes. Please check the information and try again.'
 }
 
 export default function PendingRecords() {
@@ -84,23 +108,10 @@ export default function PendingRecords() {
 
   function closeEdit() { setEditRow(null); setEditForm(null) }
   function sf(field, value) { setEditForm(prev => ({ ...prev, [field]: value })) }
-
-  async function updatePending() {
-    setSaving(true)
-    setSaveError('')
-    const { error } = await supabase.from('pending_orders').update(editForm).eq('id', editRow.id)
-    setSaving(false)
-    if (error) { setSaveError(error.message); return }
-    fetchPending()
-    closeEdit()
-  }
-
-  async function saveToFieldOrders() {
-    setSavingToFO(true)
-    setSaveError('')
-    const payload = {
+  function savePayload() {
+    return {
       ...editForm,
-      aging: editForm.aging === '' ? null : parseInt(editForm.aging),
+      aging: editForm.aging === '' ? null : parseInt(editForm.aging, 10),
       billed_amount: editForm.billed_amount === '' ? null : parseFloat(editForm.billed_amount),
       crew_payrol: editForm.crew_payrol === '' ? null : parseFloat(editForm.crew_payrol),
       date_assign: editForm.date_assign || null,
@@ -108,8 +119,24 @@ export default function PendingRecords() {
       witness_date: editForm.witness_date || null,
       date_returned: editForm.date_returned || null,
     }
-    const { error } = await supabase.from('field_orders').insert([payload])
-    if (error) { setSaveError(error.message); setSavingToFO(false); return }
+  }
+
+  async function updatePending() {
+    setSaving(true)
+    setSaveError('')
+    const { error } = await supabase.from('pending_orders').update(savePayload()).eq('id', editRow.id)
+    setSaving(false)
+    if (error) { setSaveError(friendlySaveError(error)); return }
+    fetchPending()
+    closeEdit()
+  }
+
+  async function saveToFieldOrders() {
+    setSavingToFO(true)
+    setSaveError('')
+    const payload = savePayload()
+    const { error } = await supabase.from('new_work_orders').insert([payload])
+    if (error) { setSaveError(friendlySaveError(error)); setSavingToFO(false); return }
     await supabase.from('pending_orders').delete().eq('id', editRow.id)
     setSavingToFO(false)
     fetchPending()
@@ -171,7 +198,7 @@ export default function PendingRecords() {
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">FIELD ORDER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">INSTALLED METER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">CREW NAME</th>
-                <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">LOCATION</th>
+                <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">SERVICE NUMBER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">DATE ADDED</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">STATUS</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">ACTION</th>
@@ -207,7 +234,7 @@ export default function PendingRecords() {
                     <td className="px-3 py-2.5 font-mono text-blue-600 font-medium">{row.field_order_no || '—'}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600">{row.ins_meter || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-700">{row.crew_name || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-700 max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">{row.location || '—'}</td>
+                    <td className="px-3 py-2.5 text-slate-700 max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">{row.service_number || '—'}</td>
                     <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
                       {row.created_at ? new Date(row.created_at).toLocaleDateString() : '—'}
                     </td>
@@ -250,7 +277,7 @@ export default function PendingRecords() {
                   className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
                 >
                   <CheckCircle size={13} />
-                  {savingToFO ? 'Saving…' : 'Save to FO'}
+                  {savingToFO ? 'Saving…' : 'Send to New Work'}
                 </button>
                 <button
                   onClick={updatePending}
@@ -282,34 +309,32 @@ export default function PendingRecords() {
                 <PF label="Status Crew">
                   <select value={editForm.status_crew} onChange={e => sf('status_crew', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>FIELD COMPL.</option>
-                    <option>CANCEL</option>
+                    {STATUS_CREW_OPTIONS.map(option => <option key={option}>{option}</option>)}
                   </select>
                 </PF>
                 <PF label="Date Assign">
                   <input type="date" value={editForm.date_assign} onChange={e => sf('date_assign', e.target.value)} className={iCls} />
                 </PF>
-                <PF label="Date Executed">
+                <PF label="Date Execution">
                   <input type="date" value={editForm.date_executed} onChange={e => sf('date_executed', e.target.value)} className={iCls} />
                 </PF>
                 <PF label="Type of Meter">
                   <select value={editForm.type_of_meter} onChange={e => sf('type_of_meter', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>2S PLAIN METER</option>
-                    <option>1S PLAIN METER</option>
-                    <option>3S PLAIN METER</option>
+                    {TYPE_OF_METER_OPTIONS.map(option => <option key={option}>{option}</option>)}
                   </select>
                 </PF>
                 <PF label="Job Description">
                   <select value={editForm.job_description} onChange={e => sf('job_description', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>REPLACE</option>
-                    <option>RETIRE</option>
-                    <option>REMOVE</option>
+                    {JOB_DESCRIPTION_OPTIONS.map(option => <option key={option}>{option}</option>)}
                   </select>
                 </PF>
                 <PF label="Crew Name">
-                  <input value={editForm.crew_name} onChange={e => sf('crew_name', e.target.value)} className={iCls} />
+                  <select value={editForm.crew_name} onChange={e => sf('crew_name', e.target.value)} className={iCls}>
+                    <option value="">— Select —</option>
+                    {CREW_NAME_OPTIONS.map(option => <option key={option}>{option}</option>)}
+                  </select>
                 </PF>
                 <PF label="Location" span2>
                   <input value={editForm.location} onChange={e => sf('location', e.target.value)} className={iCls} />
@@ -383,19 +408,19 @@ export default function PendingRecords() {
                 <PF label="FO Type">
                   <select value={editForm.fo_type} onChange={e => sf('fo_type', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>REPLACE</option>
-                    <option>RETIRE</option>
-                    <option>REMOVE</option>
-                    <option>CANCEL</option>
+                    {FO_TYPE_OPTIONS.map(option => <option key={option}>{option}</option>)}
                   </select>
                 </PF>
                 <PF label="Billed Amount (₱)">
-                  <input type="number" step="0.01" value={editForm.billed_amount} onChange={e => sf('billed_amount', e.target.value)} className={iCls} />
+                  <select value={editForm.billed_amount} onChange={e => sf('billed_amount', e.target.value)} className={iCls}>
+                    <option value="">— Select —</option>
+                    {BILLED_AMOUNT_OPTIONS.map(option => <option key={option}>{option}</option>)}
+                  </select>
                 </PF>
                 <PF label="For Batch">
                   <select value={editForm.for_batch} onChange={e => sf('for_batch', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>
-                    <option>ALREADY BATCH</option>
+                    {BATCH_OPTIONS.map(option => <option key={option}>{option}</option>)}
                   </select>
                 </PF>
                 <PF label="Date Returned">
@@ -403,9 +428,6 @@ export default function PendingRecords() {
                 </PF>
                 <PF label="Crew Payrol (₱)">
                   <input type="number" step="0.01" value={editForm.crew_payrol} onChange={e => sf('crew_payrol', e.target.value)} className={iCls} />
-                </PF>
-                <PF label="Percentage (%)">
-                  <input value={editForm.percentage} onChange={e => sf('percentage', e.target.value)} className={iCls} />
                 </PF>
                 <PF label="Plus Code">
                   <input value={editForm.pluscode} onChange={e => sf('pluscode', e.target.value)} className={iCls} />

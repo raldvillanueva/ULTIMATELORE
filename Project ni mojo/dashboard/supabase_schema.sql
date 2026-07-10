@@ -46,6 +46,7 @@ CREATE TABLE field_orders (
   crew_payrol DECIMAL(10,2),
   percentage TEXT,
   pluscode TEXT,
+  archived_at TIMESTAMP WITH TIME ZONE,
 
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -55,3 +56,6 @@ ALTER TABLE field_orders ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for now (adjust as needed for your auth setup)
 CREATE POLICY "Allow all" ON field_orders FOR ALL USING (true) WITH CHECK (true);
+
+-- For existing installations, run this once in the Supabase SQL Editor:
+-- ALTER TABLE field_orders ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE;
