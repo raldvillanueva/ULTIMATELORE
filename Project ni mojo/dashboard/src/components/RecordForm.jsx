@@ -235,17 +235,26 @@ async function handleSubmit(e, mode = "supabase") {
   // SAVE LOGIC (SAME FLOW, CLEANED)
   // =========================
 
-  if (!isPending) {
-    const { error: insertError } = await supabase
+if (!isPending) {
+  let result
+
+  if (recordId) {
+    result = await supabase
+      .from('field_orders')
+      .update(payload)
+      .eq('id', recordId)
+  } else {
+    result = await supabase
       .from('field_orders')
       .insert([payload])
-
-    error = insertError
-
-    if (!error) {
-      success = true
-    }
   }
+
+  error = result.error
+
+  if (!error) {
+    success = true
+  }
+}
   if (isPending) {
     const { data: existingPending } = await supabase
       .from('pending_orders')
@@ -304,9 +313,13 @@ async function handleSubmit(e, mode = "supabase") {
     return
   }
 
-  if (saveRepeat >= repeatCount) {
-    navigate('/field-orders')
-  } else {
+if (saveRepeat >= repeatCount) {
+  navigate(
+    form.archived_at
+      ? '/archived-work-orders'
+      : '/field-orders'
+  )
+} else {
     setForm(EMPTY_FORM)
     setFieldErrors({})
     setSaveRepeat(prev => prev + 1)
@@ -648,7 +661,13 @@ placeholder="Scan Installed Meter"
 
   <button
     type="button"
-    onClick={() => navigate('/field-orders')}
+  onClick={() =>
+  navigate(
+    form.archived_at
+      ? '/archived-work-orders'
+      : '/field-orders'
+  )
+}
     className="
       flex
       items-center

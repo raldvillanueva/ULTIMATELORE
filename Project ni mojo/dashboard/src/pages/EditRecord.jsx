@@ -9,6 +9,7 @@ export default function EditRecord() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isArchived, setIsArchived] = useState(false)
 
   useEffect(() => {
     supabase
@@ -25,6 +26,7 @@ export default function EditRecord() {
             Object.entries(data).map(([k, v]) => [k, v == null ? '' : v])
           )
           setData(normalized)
+setIsArchived(!!data.archived_at)
         }
         setLoading(false)
       })
@@ -42,7 +44,9 @@ export default function EditRecord() {
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate('/field-orders')}
+          onClick={() =>
+  navigate(isArchived ? '/archived-work-orders' : '/field-orders')
+}
           className="p-2 rounded-lg hover:bg-slate-200 text-slate-500 transition-colors"
         >
           <ArrowLeft size={18} />

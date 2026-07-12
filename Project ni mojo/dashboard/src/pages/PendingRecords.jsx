@@ -68,6 +68,9 @@ export default function PendingRecords() {
   const [saveError, setSaveError] = useState('')
   const [confirm, setConfirm] = useState(null)
   const [search, setSearch] = useState('')
+  const [selectedRows, setSelectedRows] = useState([])
+  const [bulkAction, setBulkAction] = useState(null)
+  const [pageError, setPageError] = useState('')
 
   const filtered = pending.filter(r => {
     if (!search) return true
@@ -85,7 +88,10 @@ export default function PendingRecords() {
   const fetchPending = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase.from('pending_orders').select('*').order('created_at', { ascending: false })
-    if (data) setPending(data)
+    if (data) {
+      setPending(data)
+      setSelectedRows(previous => previous.filter(id => data.some(row => row.id === id)))
+    }
     setLoading(false)
   }, [])
 
@@ -98,6 +104,8 @@ export default function PendingRecords() {
     return () => supabase.removeChannel(channel)
   }, [fetchPending])
 
+  useEffect(() => { setSelectedRows([]) }, [search])
+
   function openEdit(row) {
     setEditRow(row)
     const f = { ...EMPTY_FORM }
@@ -108,18 +116,20 @@ export default function PendingRecords() {
 
   function closeEdit() { setEditRow(null); setEditForm(null) }
   function sf(field, value) { setEditForm(prev => ({ ...prev, [field]: value })) }
-  function savePayload() {
+  function toPayload(record) {
+    const { id, created_at, ...rest } = record
     return {
-      ...editForm,
-      aging: editForm.aging === '' ? null : parseInt(editForm.aging, 10),
-      billed_amount: editForm.billed_amount === '' ? null : parseFloat(editForm.billed_amount),
-      crew_payrol: editForm.crew_payrol === '' ? null : parseFloat(editForm.crew_payrol),
-      date_assign: editForm.date_assign || null,
-      date_executed: editForm.date_executed || null,
-      witness_date: editForm.witness_date || null,
-      date_returned: editForm.date_returned || null,
+      ...rest,
+      aging: rest.aging === '' || rest.aging == null ? null : parseInt(rest.aging, 10),
+      billed_amount: rest.billed_amount === '' || rest.billed_amount == null ? null : parseFloat(rest.billed_amount),
+      crew_payrol: rest.crew_payrol === '' || rest.crew_payrol == null ? null : parseFloat(rest.crew_payrol),
+      date_assign: rest.date_assign || null,
+      date_executed: rest.date_executed || null,
+      witness_date: rest.witness_date || null,
+      date_returned: rest.date_returned || null,
     }
   }
+  function savePayload() { return toPayload(editForm) }
 
   async function updatePending() {
     setSaving(true)
@@ -154,6 +164,59 @@ export default function PendingRecords() {
       }
     })
   }
+  function toggleRow(id) {
+  setSelectedRows(prev =>
+    prev.includes(id)
+      ? prev.filter(x => x !== id)
+      : [...prev, id]
+  )
+}
+
+function toggleAll() {
+  if (selectedRows.length === displayPending.length) {
+    setSelectedRows([])
+  } else {
+    setSelectedRows(displayPending.map(r => r.id))
+  }
+}
+
+async function bulkDelete() {
+  if (selectedRows.length === 0) return
+
+  setConfirm({
+    message: `Delete ${selectedRows.length} pending record(s)?`,
+    onConfirm: async () => {
+      setConfirm(null)
+      setBulkAction('delete')
+      setPageError('')
+      const { error } = await supabase
+        .from('pending_orders')
+        .delete()
+        .in('id', selectedRows)
+
+      if (error) setPageError('We could not delete the selected records. Please try again.')
+      setSelectedRows([])
+      await fetchPending()
+      closeEdit()
+      setBulkAction(null)
+    }
+  })
+}
+
+async function sendSelectedToNewWork() {
+  if (selectedRows.length === 0) return
+  const selected = pending.filter(row => selectedRows.includes(row.id))
+  setBulkAction('send')
+  setPageError('')
+  const { error: insertError } = await supabase.from('new_work_orders').insert(selected.map(toPayload))
+  if (insertError) { setPageError(friendlySaveError(insertError)); setBulkAction(null); return }
+  const { error: deleteError } = await supabase.from('pending_orders').delete().in('id', selectedRows)
+  if (deleteError) setPageError('The selected records were sent, but some could not be removed from Pending. Please refresh the page.')
+  setSelectedRows([])
+  await fetchPending()
+  closeEdit()
+  setBulkAction(null)
+}
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }} className="gap-4">
@@ -167,6 +230,24 @@ export default function PendingRecords() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {selectedRows.length > 0 && (
+  <>
+    <button
+      onClick={sendSelectedToNewWork}
+      disabled={!!bulkAction}
+      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+    >
+      {bulkAction === 'send' ? 'Sending…' : `Send Selected (${selectedRows.length})`}
+    </button>
+    <button
+      onClick={bulkDelete}
+      disabled={!!bulkAction}
+      className="bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+    >
+      {bulkAction === 'delete' ? 'Deleting…' : `Delete Selected (${selectedRows.length})`}
+    </button>
+  </>
+)}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -188,12 +269,19 @@ export default function PendingRecords() {
         </div>
       </div>
 
+      {pageError && (
+        <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {pageError}
+        </div>
+      )}
+
       {/* Table */}
       <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-auto">
           <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%' }}>
             <thead className="sticky top-0 z-10">
               <tr style={{ background: '#1e293b' }}>
+                <th className="px-3 py-2.5"> <input type="checkbox" checked={ displayPending.length > 0 && selectedRows.length === displayPending.length} onChange={toggleAll}/></th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">#</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">FIELD ORDER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">INSTALLED METER</th>
@@ -207,7 +295,7 @@ export default function PendingRecords() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center">
+                  <td colSpan={9} className="px-4 py-16 text-center">
                     <div className="flex justify-center">
                       <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
@@ -215,7 +303,7 @@ export default function PendingRecords() {
                 </tr>
               ) : displayPending.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
+                 <td colSpan={9} className="px-4 py-16 text-center text-slate-400">
                     No pending records.
                   </td>
                 </tr>
@@ -230,6 +318,17 @@ export default function PendingRecords() {
                         : 'hover:bg-slate-50'
                     }`}
                   >
+                    <td className="px-3 py-2.5">
+  <input
+    type="checkbox"
+    checked={selectedRows.includes(row.id)}
+    onChange={(e) => {
+      e.stopPropagation()
+      toggleRow(row.id)
+    }}
+    onClick={(e) => e.stopPropagation()}
+  />
+</td>
                     <td className="px-3 py-2.5 text-slate-400">{i + 1}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600 font-medium">{row.field_order_no || '—'}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600">{row.ins_meter || '—'}</td>

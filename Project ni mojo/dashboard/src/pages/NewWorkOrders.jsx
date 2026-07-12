@@ -77,6 +77,8 @@ export default function NewWorkOrders() {
   const [movingId, setMovingId] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkCompleting, setBulkCompleting] = useState(false)
 
   const fetchRecords = useCallback(async () => {
     setLoading(true)
@@ -85,15 +87,31 @@ export default function NewWorkOrders() {
     if (search) query = query.or(`field_order_no.ilike.%${search}%,service_number.ilike.%${search}%,crew_name.ilike.%${search}%,ins_meter.ilike.%${search}%`)
     const { data, error: fetchError } = await query
     if (fetchError) setError(friendlyError(fetchError))
-    else setRecords(data || [])
+    else {
+      setRecords(data || [])
+      setSelectedIds(previous => previous.filter(id => (data || []).some(record => record.id === id)))
+    }
     setLoading(false)
   }, [search])
 
   useEffect(() => { fetchRecords() }, [fetchRecords])
+  useEffect(() => { setSelectedIds([]) }, [search])
 
   function openEdit(record) { setEditForm({ ...record }); setError('') }
   function closeEdit() { setEditForm(null) }
   function setField(field, value) { setEditForm(previous => ({ ...previous, [field]: value })) }
+
+  function toggleSelect(id) {
+    setSelectedIds(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(previous =>
+      records.length > 0 && records.every(record => previous.includes(record.id))
+        ? []
+        : records.map(record => record.id)
+    )
+  }
 
   async function updateWorkOrder() {
     setSaving(true)
@@ -116,14 +134,37 @@ export default function NewWorkOrders() {
     setMovingId(null)
   }
 
+  async function completeSelected() {
+    const selected = records.filter(record => selectedIds.includes(record.id))
+    if (selected.length === 0) return
+    setBulkCompleting(true)
+    setError('')
+    const { error: insertError } = await supabase.from('field_orders').insert(selected.map(savePayload))
+    if (insertError) { setError(friendlyError(insertError)); setBulkCompleting(false); return }
+    const { error: deleteError } = await supabase.from('new_work_orders').delete().in('id', selectedIds)
+    if (deleteError) setError('The selected work orders were completed, but some could not be removed from this list. Please refresh the page.')
+    setSelectedIds([])
+    await fetchRecords()
+    setBulkCompleting(false)
+  }
+
   return (
     <div className="flex h-[calc(100vh-64px)] flex-col gap-4">
       <div><h1 className="text-2xl font-bold text-slate-800">New Work Orders</h1><p className="mt-0.5 text-sm text-slate-500">Work orders sent from Pending Records and ready for completion.</p></div>
       <div className="relative shrink-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search FO#, service number, crew, or meter..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {selectedIds.length > 0 && (
+        <div className="flex shrink-0 items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
+          <p className="text-sm font-medium text-blue-700">{selectedIds.length} selected</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelectedIds([])} className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100">Clear</button>
+            <button onClick={completeSelected} disabled={bulkCompleting} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"><CheckCircle size={14} /> {bulkCompleting ? 'Completing...' : `Mark ${selectedIds.length} Completed`}</button>
+          </div>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm"><thead className="sticky top-0 bg-slate-800 text-xs text-slate-300"><tr><th className="px-4 py-3 text-left font-medium">FIELD ORDER</th><th className="px-4 py-3 text-left font-medium">INSTALLED METER</th><th className="px-4 py-3 text-left font-medium">CREW NAME</th><th className="px-4 py-3 text-left font-medium">SERVICE NUMBER</th><th className="px-4 py-3 text-left font-medium">STATUS</th><th className="px-4 py-3 text-right font-medium">ACTION</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={6} className="px-4 py-16 text-center text-slate-400">Loading new work orders...</td></tr> : records.length === 0 ? <tr><td colSpan={6} className="px-4 py-16 text-center text-slate-400">No new work orders.</td></tr> : records.map(record => <tr key={record.id} onClick={() => openEdit(record)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"><td className="px-4 py-3 font-mono text-blue-600">{record.field_order_no || '—'}</td><td className="px-4 py-3">{record.ins_meter || '—'}</td><td className="px-4 py-3">{record.crew_name || '—'}</td><td className="px-4 py-3">{record.service_number || '—'}</td><td className="px-4 py-3"><span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">NEW</span></td><td className="px-4 py-3 text-right"><button onClick={event => { event.stopPropagation(); completeWorkOrder(record) }} disabled={movingId === record.id} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"><CheckCircle size={14} /> {movingId === record.id ? 'Completing...' : 'Mark Completed'}</button></td></tr>)}</tbody>
+        <table className="w-full text-sm"><thead className="sticky top-0 bg-slate-800 text-xs text-slate-300"><tr><th className="w-10 px-4 py-3 text-center font-medium"><input type="checkbox" checked={records.length > 0 && records.every(record => selectedIds.includes(record.id))} onChange={toggleSelectAll} /></th><th className="px-4 py-3 text-left font-medium">FIELD ORDER</th><th className="px-4 py-3 text-left font-medium">INSTALLED METER</th><th className="px-4 py-3 text-left font-medium">CREW NAME</th><th className="px-4 py-3 text-left font-medium">SERVICE NUMBER</th><th className="px-4 py-3 text-left font-medium">STATUS</th><th className="px-4 py-3 text-right font-medium">ACTION</th></tr></thead>
+          <tbody>{loading ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-400">Loading new work orders...</td></tr> : records.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-400">No new work orders.</td></tr> : records.map(record => <tr key={record.id} onClick={() => openEdit(record)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"><td className="px-4 py-3 text-center" onClick={event => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(record.id)} onChange={() => toggleSelect(record.id)} /></td><td className="px-4 py-3 font-mono text-blue-600">{record.field_order_no || '—'}</td><td className="px-4 py-3">{record.ins_meter || '—'}</td><td className="px-4 py-3">{record.crew_name || '—'}</td><td className="px-4 py-3">{record.service_number || '—'}</td><td className="px-4 py-3"><span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">NEW</span></td><td className="px-4 py-3 text-right"><button onClick={event => { event.stopPropagation(); completeWorkOrder(record) }} disabled={movingId === record.id} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"><CheckCircle size={14} /> {movingId === record.id ? 'Completing...' : 'Mark Completed'}</button></td></tr>)}</tbody>
         </table>
       </div>
 

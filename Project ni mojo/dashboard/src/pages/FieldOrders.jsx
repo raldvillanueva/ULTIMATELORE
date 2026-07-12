@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Plus, Search, ChevronLeft, ChevronRight, X, Save, Download, Upload, Archive } from 'lucide-react'
@@ -104,6 +104,12 @@ const COLS = [
   { label: 'PLUSCODE',            key: 'pluscode',              w: 90,  render: r => r.pluscode || '—' },
 ]
 
+// Columns pinned to the left (Status Crew → Service Number). Everything after
+// this stays in its own horizontally-scrollable table starting at Remove Meter.
+const FROZEN_COL_COUNT = 9
+const FROZEN_COLS = COLS.slice(0, FROZEN_COL_COUNT)
+const SCROLL_COLS = COLS.slice(FROZEN_COL_COUNT)
+
 export default function FieldOrders() {
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
@@ -126,6 +132,11 @@ export default function FieldOrders() {
   const [editForm, setEditForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [hoverRowId, setHoverRowId] = useState(null)
+  const leftScrollRef = useRef(null)
+  const rightScrollRef = useRef(null)
+  const syncingScroll = useRef(false)
+  const snapTimeout = useRef(null)
   const navigate = useNavigate()
   const [selectedRows,setSelectedRows]=useState([])
   const [selectAllPages, setSelectAllPages] = useState(false)
@@ -163,6 +174,40 @@ function deleteSelected() {
     }
   })
 }
+function archiveSelected() {
+  const count = selectAllPages ? total : selectedRows.length
+  setConfirm({
+    message: `Archive ${count.toLocaleString()} record${count > 1 ? 's' : ''}?`,
+    confirmLabel: 'Yes, archive',
+    tone: 'archive',
+    onConfirm: async () => {
+      if (selectAllPages) {
+        let q = supabase.from('field_orders').update({ archived_at: new Date().toISOString() }).is('archived_at', null)
+        const hasFilters = search || statusFilter !== 'All' || typeOfMeterFilter !== 'All' || jobDescriptionFilter !== 'All' || crewNameFilter !== 'All' || foTypeFilter !== 'All' || billedAmountFilter !== 'All' || batchFilter !== 'All' || dateExecutedFilter
+        if (!hasFilters) {
+          q = q.neq('id', '00000000-0000-0000-0000-000000000000')
+        } else {
+          if (search) q = q.or(`field_order_no.ilike.%${search}%,service_number.ilike.%${search}%,crew_name.ilike.%${search}%,location.ilike.%${search}%,remove_meter.ilike.%${search}%,ins_meter.ilike.%${search}%`)
+          if (statusFilter !== 'All') q = statusFilter === 'FIELD COMPLETED' ? q.ilike('status_crew', '%FIELD%') : q.ilike('status_crew', statusFilter)
+          if (typeOfMeterFilter !== 'All') q = q.ilike('type_of_meter', typeOfMeterFilter)
+          if (jobDescriptionFilter !== 'All') q = q.ilike('job_description', jobDescriptionFilter)
+          if (crewNameFilter !== 'All') q = q.ilike('crew_name', crewNameFilter)
+          if (foTypeFilter !== 'All') q = q.ilike('fo_type', foTypeFilter)
+          if (billedAmountFilter !== 'All') q = q.eq('billed_amount', parseFloat(billedAmountFilter))
+          if (batchFilter !== 'All') q = q.ilike('for_batch', batchFilter)
+          if (dateExecutedFilter) q = q.eq('date_executed', dateExecutedFilter)
+        }
+        await q
+      } else {
+        await supabase.from('field_orders').update({ archived_at: new Date().toISOString() }).in('id', selectedRows)
+      }
+      setSelectedRows([])
+      setSelectAllPages(false)
+      fetchRecords()
+      setConfirm(null)
+    }
+  })
+}
 function toggleRow(id){
 
 setSelectedRows(prev=>
@@ -185,6 +230,7 @@ prev.filter(x=>x!==id)
     let q = supabase
       .from('field_orders')
       .select('*', { count: 'exact' })
+      .is('archived_at', null)
       .order('seq', { ascending: true, nullsFirst: true })
       .order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
@@ -221,6 +267,66 @@ useEffect(() => {
   setSelectedRows([])
 }, [search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter])
 
+
+  const ROW_HEIGHT = 33
+  const rafId = useRef(null)
+  const isSnapping = useRef(false)
+
+  function snapToRow() {
+    const el = rightScrollRef.current
+    if (!el) return
+    const snapped = Math.round(el.scrollTop / ROW_HEIGHT) * ROW_HEIGHT
+    const delta = snapped - el.scrollTop
+    if (delta !== 0) {
+      isSnapping.current = true
+      el.scrollTo({ top: snapped, behavior: 'smooth' })
+      leftScrollRef.current?.scrollTo({ top: snapped, behavior: 'smooth' })
+      setTimeout(() => { isSnapping.current = false }, 250)
+    }
+  }
+
+  useEffect(() => {
+    if (!('onscrollend' in window)) return
+    const rightEl = rightScrollRef.current
+    const leftEl = leftScrollRef.current
+    if (!rightEl) return
+    rightEl.addEventListener('scrollend', snapToRow)
+    leftEl?.addEventListener('scrollend', snapToRow)
+    return () => {
+      rightEl.removeEventListener('scrollend', snapToRow)
+      leftEl?.removeEventListener('scrollend', snapToRow)
+    }
+  }, [])
+
+  function scheduleRowSnap() {
+    if ('onscrollend' in window) return // native scrollend listener handles it
+    if (snapTimeout.current) clearTimeout(snapTimeout.current)
+    snapTimeout.current = setTimeout(snapToRow, 120)
+  }
+
+  function handleLeftScroll(e) {
+    if (isSnapping.current) return
+    if (syncingScroll.current) { syncingScroll.current = false; return }
+    const scrollTop = e.currentTarget.scrollTop
+    if (rafId.current) cancelAnimationFrame(rafId.current)
+    rafId.current = requestAnimationFrame(() => {
+      syncingScroll.current = true
+      if (rightScrollRef.current) rightScrollRef.current.scrollTop = scrollTop
+    })
+    scheduleRowSnap()
+  }
+
+  function handleRightScroll(e) {
+    if (isSnapping.current) return
+    if (syncingScroll.current) { syncingScroll.current = false; return }
+    const scrollTop = e.currentTarget.scrollTop
+    if (rafId.current) cancelAnimationFrame(rafId.current)
+    rafId.current = requestAnimationFrame(() => {
+      syncingScroll.current = true
+      if (leftScrollRef.current) leftScrollRef.current.scrollTop = scrollTop
+    })
+    scheduleRowSnap()
+  }
 
   function toggleFilter(key, e) {
     if (openFilterKey === key) { setOpenFilterKey(null); return }
@@ -333,7 +439,7 @@ useEffect(() => {
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  const [exporting, setExporting] = useState(false)
+  const [exportingSelected, setExportingSelected] = useState(false)
   const [showImport, setShowImport] = useState(false)
 
   const EXPORT_FIELDS = [
@@ -375,49 +481,6 @@ useEffect(() => {
     { key: 'percentage',            label: '%' },
     { key: 'pluscode',              label: 'Pluscode' },
   ]
-
-  async function exportCSV() {
-    setExporting(true)
-    const BATCH = 1000
-    let allData = [], from = 0
-    while (true) {
-      const { data, error } = await supabase
-        .from('field_orders')
-        .select('*')
-        .order('seq', { ascending: true, nullsFirst: true })
-        .order('created_at', { ascending: false })
-        .range(from, from + BATCH - 1)
-      if (error || !data || data.length === 0) break
-      allData = allData.concat(data)
-      if (data.length < BATCH) break
-      from += BATCH
-    }
-    setExporting(false)
-    const data = allData
-    if (!data || data.length === 0) return
-
-    function esc(val) {
-      if (val === null || val === undefined) return ''
-      const s = String(val)
-      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
-    }
-
-    const header = EXPORT_FIELDS.map(f => f.label).join(',')
-    const rows = data.map(row => EXPORT_FIELDS.map(f => esc(row[f.key])).join(','))
-    const csv = '﻿' + [header, ...rows].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `field_orders_${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  const [exportingSelected, setExportingSelected] = useState(false)
 
   async function exportSelected() {
     if (selectedRows.length === 0) return
@@ -464,6 +527,7 @@ useEffect(() => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }} className="gap-4">
+      <style>{`.no-scrollbar{scrollbar-width:none;-ms-overflow-style:none}.no-scrollbar::-webkit-scrollbar{display:none}`}</style>
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div>
@@ -478,15 +542,6 @@ useEffect(() => {
   >
     <Upload size={15} />
     Import
-  </button>
-
-  <button
-    onClick={exportCSV}
-    disabled={exporting}
-    className="flex items-center gap-2 border border-slate-200 hover:bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-  >
-    <Download size={15} />
-    {exporting ? 'Exporting…' : 'Export'}
   </button>
 
   <input
@@ -607,6 +662,13 @@ Add Record
               </button>
             )}
             <button
+              onClick={archiveSelected}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold bg-slate-600 hover:bg-slate-700 text-white transition-colors"
+            >
+              <Archive size={14} />
+              Archive {(selectAllPages ? total : selectedRows.length).toLocaleString()}
+            </button>
+            <button
               onClick={deleteSelected}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${selectAllPages ? 'bg-white text-red-600 hover:bg-red-50' : 'bg-red-600 text-white hover:bg-red-700'}`}
             >
@@ -617,134 +679,209 @@ Add Record
       )}
       {/* Spreadsheet */}
       <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-auto">
-          <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%' }}>
-            <thead className="sticky top-0 z-10">
-              <tr style={{ background: '#1e293b' }}>
-                <th
-style={{ width:40, minWidth:40, background:'#1e293b' }}
-className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
->
-<input
+        <div className="flex-1 min-h-0 flex">
 
-type="checkbox"
-
-checked={
-records.length > 0 &&
-records.every(r => selectedRows.includes(r.id))
-}
-
-onChange={(e)=>{
-
-
-if(e.target.checked){
-
-
-setSelectedRows(prev => {
-  const newIds = records.map(r => r.id).filter(id => !prev.includes(id))
-  return [...prev, ...newIds]
-})
-
-
-}
-else{
-
-
-setSelectedRows(prev => prev.filter(id => !records.map(r => r.id).includes(id)))
-
-
-}
-
-
-}}
-
-/>
-</th>
-                <th
-                  style={{ width: 40, minWidth: 40, background: '#1e293b' }}
-                  className="px-2 py-2.5 text-center font-medium text-slate-400 border-r border-slate-700"
-                >
-                  #
-                </th>
-                {COLS.map(col => {
-                  const filterCfg = COL_FILTER_KEYS[col.key]
-                  const isActive = filterCfg && filterCfg.isActive()
-                  return (
-                    <th
-                      key={col.key}
-                      style={{ minWidth: col.w, maxWidth: col.w, background: '#1e293b' }}
-                      className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap border-r border-slate-700 last:border-0"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span className="flex-1 truncate">{col.label}</span>
-                        {filterCfg && (
-                          <button
-                            data-filter-dropdown
-                            onClick={e => { e.stopPropagation(); toggleFilter(col.key, e) }}
-                            className={`shrink-0 rounded px-0.5 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
-                            style={{ fontSize: 9, lineHeight: 1 }}
-                          >
-                            {isActive ? '▼' : '▽'}
-                          </button>
-                        )}
-                      </div>
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={COLS.length + 1} className="px-4 py-16 text-center">
-                    <div className="flex justify-center">
-                      <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  </td>
-                </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={COLS.length + 1} className="px-4 py-16 text-center text-slate-400">No records found.</td>
-                </tr>
-              ) : (
-                records.map((row, idx) => {
-                  const sel = editRow?.id === row.id
-                  return (
-                    <tr
-  key={row.id}
-  onClick={() => sel ? closeEdit() : openEdit(row)}
-  style={{ background: sel ? '#eff6ff' : undefined }}
-  className={`cursor-pointer border-b border-slate-100 transition-colors group ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : 'hover:bg-slate-50'}`}
->
-  <td className="px-2 py-2 text-center">
-  <input
-  type="checkbox"
-  checked={selectedRows.includes(row.id)}
-  onClick={(e) => e.stopPropagation()}
-  onChange={() => toggleRow(row.id)}
-/>
-</td>
-                      <td
-                        style={{ width: 40, minWidth: 40, background: sel ? '#eff6ff' : 'white' }}
-                        className="sticky left-0 z-[5] px-2 py-2 text-center text-slate-400 border-r border-slate-100 group-hover:bg-slate-50"
+          {/* ── Frozen columns: checkbox, #, Status Crew → Service Number. No horizontal scroll here. ── */}
+          <div
+            ref={leftScrollRef}
+            onScroll={handleLeftScroll}
+            className="shrink-0 border-r-2 border-slate-300 overflow-y-auto no-scrollbar"
+            style={{ overflowX: 'hidden' }}
+          >
+            <table className="text-xs border-collapse" style={{ width: 'max-content', tableLayout: 'fixed' }}>
+              <thead className="sticky top-0 z-20">
+                <tr style={{ background: '#1e293b', height: 37 }}>
+                  <th
+                    style={{ width: 40, minWidth: 40, background: '#1e293b' }}
+                    className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={
+                        records.length > 0 &&
+                        records.every(r => selectedRows.includes(r.id))
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRows(prev => {
+                            const newIds = records.map(r => r.id).filter(id => !prev.includes(id))
+                            return [...prev, ...newIds]
+                          })
+                        } else {
+                          setSelectedRows(prev => prev.filter(id => !records.map(r => r.id).includes(id)))
+                        }
+                      }}
+                    />
+                  </th>
+                  <th
+                    style={{ width: 40, minWidth: 40, background: '#1e293b' }}
+                    className="px-2 py-2.5 text-center font-medium text-slate-400 border-r border-slate-700"
+                  >
+                    #
+                  </th>
+                  {FROZEN_COLS.map(col => {
+                    const filterCfg = COL_FILTER_KEYS[col.key]
+                    const isActive = filterCfg && filterCfg.isActive()
+                    return (
+                      <th
+                        key={col.key}
+                        style={{ minWidth: col.w, maxWidth: col.w, background: '#1e293b' }}
+                        className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap border-r border-slate-700 last:border-0"
                       >
-                        {page * PAGE_SIZE + idx + 1}
-                      </td>
-                      {COLS.map(col => (
-                        <td
-                          key={col.key}
-                          style={{ minWidth: col.w, maxWidth: col.w }}
-                          className={`px-3 py-2 border-r border-slate-100 last:border-0 text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis${col.mono ? ' font-mono' : ''}`}
-                        >
-                          {col.render(row)}
+                        <div className="flex items-center gap-1">
+                          <span className="flex-1 truncate">{col.label}</span>
+                          {filterCfg && (
+                            <button
+                              data-filter-dropdown
+                              onClick={e => { e.stopPropagation(); toggleFilter(col.key, e) }}
+                              className={`shrink-0 rounded px-0.5 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                              style={{ fontSize: 9, lineHeight: 1 }}
+                            >
+                              {isActive ? '▼' : '▽'}
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={FROZEN_COLS.length + 2} className="px-4 py-16 text-center">
+                      <div className="flex justify-center">
+                        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    </td>
+                  </tr>
+                ) : records.length === 0 ? (
+                  <tr>
+                    <td colSpan={FROZEN_COLS.length + 2} className="px-4 py-16 text-center text-slate-400">No records found.</td>
+                  </tr>
+                ) : (
+                  records.map((row, idx) => {
+                    const sel = editRow?.id === row.id
+                    const rowBg = sel ? '#eff6ff' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => sel ? closeEdit() : openEdit(row)}
+                        onMouseEnter={() => setHoverRowId(row.id)}
+                        onMouseLeave={() => setHoverRowId(null)}
+                        style={{ background: rowBg, height: 33 }}
+                        className={`cursor-pointer border-b border-slate-100 transition-colors ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : ''}`}
+                      >
+                        <td className="px-2 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.includes(row.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleRow(row.id)}
+                          />
                         </td>
-                      ))}
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                        <td
+                          style={{ width: 40, minWidth: 40 }}
+                          className="px-2 py-2 text-center text-slate-400 border-r border-slate-100"
+                        >
+                          {page * PAGE_SIZE + idx + 1}
+                        </td>
+                        {FROZEN_COLS.map(col => (
+                          <td
+                            key={col.key}
+                            style={{ minWidth: col.w, maxWidth: col.w }}
+                            className={`px-3 py-2 border-r border-slate-100 last:border-0 text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis${col.mono ? ' font-mono' : ''}`}
+                          >
+                            {col.render(row)}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Scrollable columns: Remove Meter onward. Horizontal scroll starts here. ── */}
+          <div
+            ref={rightScrollRef}
+            onScroll={handleRightScroll}
+            className="flex-1 min-w-0 overflow-auto"
+          >
+            <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%', tableLayout: 'fixed' }}>
+              <thead className="sticky top-0 z-20">
+                <tr style={{ background: '#1e293b', height: 37 }}>
+                  {SCROLL_COLS.map(col => {
+                    const filterCfg = COL_FILTER_KEYS[col.key]
+                    const isActive = filterCfg && filterCfg.isActive()
+                    return (
+                      <th
+                        key={col.key}
+                        style={{ minWidth: col.w, maxWidth: col.w, background: '#1e293b' }}
+                        className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap border-r border-slate-700 last:border-0"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="flex-1 truncate">{col.label}</span>
+                          {filterCfg && (
+                            <button
+                              data-filter-dropdown
+                              onClick={e => { e.stopPropagation(); toggleFilter(col.key, e) }}
+                              className={`shrink-0 rounded px-0.5 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+                              style={{ fontSize: 9, lineHeight: 1 }}
+                            >
+                              {isActive ? '▼' : '▽'}
+                            </button>
+                          )}
+                        </div>
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={SCROLL_COLS.length} className="px-4 py-16 text-center">
+                      <div className="flex justify-center">
+                        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    </td>
+                  </tr>
+                ) : records.length === 0 ? (
+                  <tr>
+                    <td colSpan={SCROLL_COLS.length} className="px-4 py-16 text-center text-slate-400">No records found.</td>
+                  </tr>
+                ) : (
+                  records.map((row, idx) => {
+                    const sel = editRow?.id === row.id
+                    const rowBg = sel ? '#eff6ff' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => sel ? closeEdit() : openEdit(row)}
+                        onMouseEnter={() => setHoverRowId(row.id)}
+                        onMouseLeave={() => setHoverRowId(null)}
+                        style={{ background: rowBg, height: 33 }}
+                        className={`cursor-pointer border-b border-slate-100 transition-colors ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : ''}`}
+                      >
+                        {SCROLL_COLS.map(col => (
+                          <td
+                            key={col.key}
+                            style={{ minWidth: col.w, maxWidth: col.w }}
+                            className={`px-3 py-2 border-r border-slate-100 last:border-0 text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis${col.mono ? ' font-mono' : ''}`}
+                          >
+                            {col.render(row)}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
         </div>
 
         {/* Pagination */}
@@ -1017,8 +1154,11 @@ Delete this record
               <button onClick={() => setConfirm(null)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                 Cancel
               </button>
-              <button onClick={confirm.onConfirm} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
-                Yes, delete
+              <button
+                onClick={confirm.onConfirm}
+                className={`flex-1 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${confirm.tone === 'archive' ? 'bg-slate-600 hover:bg-slate-700' : 'bg-red-600 hover:bg-red-700'}`}
+              >
+                {confirm.confirmLabel || 'Yes, delete'}
               </button>
             </div>
           </div>

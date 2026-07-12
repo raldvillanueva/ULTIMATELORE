@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, ClipboardList, Zap, Clock } from 'lucide-react'
-
+import { LayoutDashboard, ClipboardList, Zap, Clock, Archive } from 'lucide-react'
+import logo from '../assets/mb-logo.jpg'
 const navItems = [
   
   { to: '/field-orders', icon: ClipboardList, label: 'Field Orders' },
@@ -26,12 +26,8 @@ export default function Sidebar() {
         />
 
         <h1 className="text-center text-lg font-bold tracking-wide">
-          MB Development
-        </h1>
-
-        <p className="mt-1 text-center text-xs text-gray-400">
           Field Order Management
-        </p>
+        </h1>
 
       </div>
 
