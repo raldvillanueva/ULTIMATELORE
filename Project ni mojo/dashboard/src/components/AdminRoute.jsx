@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 
-export default function ProtectedRoute({ children }) {
-  const { session, loading } = useAuth()
+export default function AdminRoute({ children }) {
+  const { role, loading } = useAuth()
 
   if (loading) {
     return (
@@ -12,5 +12,5 @@ export default function ProtectedRoute({ children }) {
     )
   }
 
-  return session ? children : <Navigate to="/" replace />
+  return role === 'admin' ? children : <Navigate to="/field-orders" replace />
 }

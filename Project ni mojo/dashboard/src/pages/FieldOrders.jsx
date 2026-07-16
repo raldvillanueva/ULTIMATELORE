@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Plus, Search, ChevronLeft, ChevronRight, X, Save, Download, Upload, Archive } from 'lucide-react'
 import ImportModal from '../components/ImportModal'
+import RequestDeletionModal from '../components/RequestDeletionModal'
+import { useAuth } from '../lib/AuthContext'
+import { computeAgingDays, isOverdue } from '../lib/aging'
 
 const PAGE_SIZE = 50
 
@@ -91,7 +94,12 @@ const COLS = [
   { label: 'POLE TAG',            key: 'pole_tag',              w: 90,  render: r => r.pole_tag || '—' },
   { label: 'BOOBA NUMBER',        key: 'booba_number',          w: 115, render: r => r.booba_number || '—' },
   { label: 'MDLTR NO.',           key: 'mdltr_no',              w: 90,  render: r => r.mdltr_no || '—' },
-  { label: 'AGING',               key: 'aging',                 w: 70,  render: r => r.aging != null ? r.aging : '—' },
+  { label: 'AGING',               key: 'aging',                 w: 70,  render: r => {
+      const days = computeAgingDays(r.date_executed)
+      if (days == null) return '—'
+      return <span className={isOverdue(r) ? 'text-red-600 font-bold' : ''}>{days}</span>
+    }
+  },
   { label: 'WITNESS DATE',        key: 'witness_date',          w: 115, render: r => r.witness_date || '—' },
   { label: 'REMARKS',             key: 'remarks',               w: 200, render: r => r.remarks || '—' },
   { label: 'LOCATION',            key: 'location',              w: 260, render: r => r.location || '—' },
@@ -111,6 +119,9 @@ const FROZEN_COLS = COLS.slice(0, FROZEN_COL_COUNT)
 const SCROLL_COLS = COLS.slice(FROZEN_COL_COUNT)
 
 export default function FieldOrders() {
+  const { role } = useAuth()
+  const isAdmin = role === 'admin'
+  const [showDeletionRequest, setShowDeletionRequest] = useState(false)
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -536,6 +547,8 @@ useEffect(() => {
         </div>
         <div className="flex items-center gap-3">
 
+  {isAdmin && (
+    <>
   <button
     onClick={() => setShowImport(true)}
     className="flex items-center gap-2 border border-slate-200 hover:bg-slate-100 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -565,7 +578,6 @@ useEffect(() => {
     "
     placeholder="Qty"
   />
-
 
 <button
   onClick={() =>
@@ -597,7 +609,8 @@ useEffect(() => {
 Add Record
 
 </button>
-
+    </>
+  )}
 
 </div>
       </div>
@@ -618,7 +631,7 @@ Add Record
 
 
       {/* Selection Banner */}
-      {selectedRows.length > 0 && (
+      {isAdmin && selectedRows.length > 0 && (
         <div className={`shrink-0 flex items-center justify-between px-4 py-2.5 rounded-lg transition-colors ${selectAllPages ? 'bg-blue-600' : 'bg-blue-50 border border-blue-200'}`}>
           <div className="flex items-center gap-3">
             {selectAllPages ? (
@@ -691,6 +704,7 @@ Add Record
             <table className="text-xs border-collapse" style={{ width: 'max-content', tableLayout: 'fixed' }}>
               <thead className="sticky top-0 z-20">
                 <tr style={{ background: '#1e293b', height: 37 }}>
+<<<<<<< HEAD
                   <th
                     style={{ width: 40, minWidth: 40, background: '#1e293b' }}
                     className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
@@ -713,6 +727,32 @@ Add Record
                       }}
                     />
                   </th>
+=======
+                  {isAdmin && (
+                    <th
+                      style={{ width: 40, minWidth: 40, background: '#1e293b' }}
+                      className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={
+                          records.length > 0 &&
+                          records.every(r => selectedRows.includes(r.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRows(prev => {
+                              const newIds = records.map(r => r.id).filter(id => !prev.includes(id))
+                              return [...prev, ...newIds]
+                            })
+                          } else {
+                            setSelectedRows(prev => prev.filter(id => !records.map(r => r.id).includes(id)))
+                          }
+                        }}
+                      />
+                    </th>
+                  )}
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                   <th
                     style={{ width: 40, minWidth: 40, background: '#1e293b' }}
                     className="px-2 py-2.5 text-center font-medium text-slate-400 border-r border-slate-700"
@@ -749,7 +789,11 @@ Add Record
               <tbody>
                 {loading ? (
                   <tr>
+<<<<<<< HEAD
                     <td colSpan={FROZEN_COLS.length + 2} className="px-4 py-16 text-center">
+=======
+                    <td colSpan={FROZEN_COLS.length + (isAdmin ? 2 : 1)} className="px-4 py-16 text-center">
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                       <div className="flex justify-center">
                         <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                       </div>
@@ -757,12 +801,21 @@ Add Record
                   </tr>
                 ) : records.length === 0 ? (
                   <tr>
+<<<<<<< HEAD
                     <td colSpan={FROZEN_COLS.length + 2} className="px-4 py-16 text-center text-slate-400">No records found.</td>
+=======
+                    <td colSpan={FROZEN_COLS.length + (isAdmin ? 2 : 1)} className="px-4 py-16 text-center text-slate-400">No records found.</td>
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                   </tr>
                 ) : (
                   records.map((row, idx) => {
                     const sel = editRow?.id === row.id
+<<<<<<< HEAD
                     const rowBg = sel ? '#eff6ff' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
+=======
+                    const overdue = isOverdue(row)
+                    const rowBg = sel ? '#eff6ff' : overdue ? '#fef2f2' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     return (
                       <tr
                         key={row.id}
@@ -772,6 +825,7 @@ Add Record
                         style={{ background: rowBg, height: 33 }}
                         className={`cursor-pointer border-b border-slate-100 transition-colors ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : ''}`}
                       >
+<<<<<<< HEAD
                         <td className="px-2 py-2 text-center">
                           <input
                             type="checkbox"
@@ -786,6 +840,24 @@ Add Record
                         >
                           {page * PAGE_SIZE + idx + 1}
                         </td>
+=======
+                        {isAdmin && (
+                          <td className="px-2 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.includes(row.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => toggleRow(row.id)}
+                            />
+                          </td>
+                        )}
+                        <td
+                          style={{ width: 40, minWidth: 40 }}
+                          className="px-2 py-2 text-center text-slate-400 border-r border-slate-100"
+                        >
+                          {page * PAGE_SIZE + idx + 1}
+                        </td>
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                         {FROZEN_COLS.map(col => (
                           <td
                             key={col.key}
@@ -855,7 +927,12 @@ Add Record
                 ) : (
                   records.map((row, idx) => {
                     const sel = editRow?.id === row.id
+<<<<<<< HEAD
                     const rowBg = sel ? '#eff6ff' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
+=======
+                    const overdue = isOverdue(row)
+                    const rowBg = sel ? '#eff6ff' : overdue ? '#fef2f2' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     return (
                       <tr
                         key={row.id}
@@ -927,22 +1004,26 @@ Add Record
                 <h2 className="font-mono font-bold text-slate-800 text-lg">{editRow.field_order_no || `ID #${editRow.id}`}</h2>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={archiveRecord}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  <Archive size={14} />
-                  Archive
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  <Save size={14} />
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={archiveRecord}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <Archive size={14} />
+                      Archive
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <Save size={14} />
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </>
+                )}
                 <button onClick={closeEdit} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                   <X size={18} />
                 </button>
@@ -955,6 +1036,8 @@ Add Record
 
             {/* Drawer Body */}
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-6">
+
+              <fieldset disabled={!isAdmin} className="space-y-6 border-0 p-0 m-0 min-w-0">
 
               <PS title="Main Information">
                 <PF label="Field Order No.">
@@ -1113,35 +1196,36 @@ Add Record
                 </PF>
               </PS>
 
+              </fieldset>
+
               <div className="pt-1 border-t border-slate-100">
-
-<button
-
-onClick={() => { closeEdit(); setDeleteTarget(editRow) }}
-
-className="
-w-full
-px-4
-py-2
-border
-border-red-200
-text-red-600
-hover:bg-red-50
-rounded-lg
-text-sm
-font-medium
-"
-
->
-
-Delete this record
-
-</button>
-
-</div>
+                {isAdmin ? (
+                  <button
+                    onClick={() => { closeEdit(); setDeleteTarget(editRow) }}
+                    className="w-full px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium"
+                  >
+                    Delete this record
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowDeletionRequest(true)}
+                    className="w-full px-4 py-2 border border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg text-sm font-medium"
+                  >
+                    Request Deletion
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </>
+      )}
+
+      {showDeletionRequest && editRow && (
+        <RequestDeletionModal
+          record={editRow}
+          onClose={() => setShowDeletionRequest(false)}
+          onSubmitted={() => { setShowDeletionRequest(false); closeEdit() }}
+        />
       )}
 
       {/* Confirm Modal */}

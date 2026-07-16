@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Save, X } from 'lucide-react'
 import { addPendingOrders } from '../lib/pendingStorage'
 import { useLocation } from 'react-router-dom'
+import { useAuth } from '../lib/AuthContext'
 
 const EMPTY_FORM = {
   // Main Info
@@ -83,6 +84,11 @@ function SectionTitle({ title }) {
 }
 
 export default function RecordForm({ initialData, recordId, repeatCount }) {
+  const { role } = useAuth()
+  const isStaff = role === 'staff'
+  const fastFONoRef = useRef(null)
+  const fastMeterRef = useRef(null)
+  const autoSubmitLock = useRef(false)
   const [form, setForm] = useState(initialData || EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [savingPending, setSavingPending] = useState(false)
@@ -153,7 +159,7 @@ async function saveRecord(payload, recordId) {
 }
 
 
-async function handleSubmit(e, mode = "supabase") {
+async function handleSubmit(e, mode = "supabase", { auto = false } = {}) {
   e.preventDefault()
   setError('')
   const isPending = mode === "pending"
@@ -286,7 +292,7 @@ if (!isPending) {
 
     setFieldErrors({})
     setSavingPending(false)
-    if (pendingRepeat >= repeatCount) {
+    if (!auto && pendingRepeat >= repeatCount) {
       navigate('/field-orders')
     } else {
       setForm(EMPTY_FORM)
@@ -327,6 +333,21 @@ if (saveRepeat >= repeatCount) {
 
   setSaving(false)
 }
+async function submitFastEncoding() {
+  if (autoSubmitLock.current) return
+  autoSubmitLock.current = true
+  await handleSubmit({ preventDefault: () => {} }, 'pending', { auto: true })
+  autoSubmitLock.current = false
+  fastFONoRef.current?.focus()
+}
+
+function handleFastEncodingKeyDown(e) {
+  if (e.key !== 'Enter') return
+  e.preventDefault()
+  if (!form.field_order_no || !form.ins_meter) return
+  submitFastEncoding()
+}
+
 function deletePendingRecord(id) {
 
   const existingPending =
@@ -369,6 +390,8 @@ errorMessage={fieldErrors.field_order_no}
 
 <input
 {...text('field_order_no')}
+ref={fastFONoRef}
+onKeyDown={handleFastEncodingKeyDown}
 placeholder="Scan Field Order"
 />
 
@@ -384,6 +407,8 @@ errorMessage={fieldErrors.ins_meter}
 
 <input
 {...text('ins_meter')}
+ref={fastMeterRef}
+onKeyDown={handleFastEncodingKeyDown}
 placeholder="Scan Installed Meter"
 />
 
@@ -397,6 +422,8 @@ placeholder="Scan Installed Meter"
         </div>
       )}
 
+      {!isStaff && (
+      <>
       {/* Section 1 – Main Info */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -743,6 +770,8 @@ placeholder="Scan Installed Meter"
 
 
 </div>
+      </>
+      )}
     </form>
   )
 }

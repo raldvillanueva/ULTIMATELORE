@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { X, Save, CheckCircle, Search } from 'lucide-react'
+import { useAuth } from '../lib/AuthContext'
 
 const STATUS_CREW_OPTIONS = ['FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
 const TYPE_OF_METER_OPTIONS = ['12S', '12S ID METER', '1S', '1S EMC L-G', '25S', '2S EMC L-G', '2S EMC L-L', '2S EMX', '2S ID', '2S ID METER', '2S ID METER/ERC', '2S PLAIN METER', '9S', 'EMX', 'ERC 2S PLAIN METER', 'FOR REPLACE', 'KLOAD', 'RETURNED']
@@ -58,6 +59,8 @@ function friendlySaveError(error) {
 }
 
 export default function PendingRecords() {
+  const { role } = useAuth()
+  const isAdmin = role === 'admin'
   const [pending, setPending] = useState([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState('STACK')
@@ -230,7 +233,11 @@ async function sendSelectedToNewWork() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+<<<<<<< HEAD
           {selectedRows.length > 0 && (
+=======
+          {isAdmin && selectedRows.length > 0 && (
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
   <>
     <button
       onClick={sendSelectedToNewWork}
@@ -281,7 +288,13 @@ async function sendSelectedToNewWork() {
           <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%' }}>
             <thead className="sticky top-0 z-10">
               <tr style={{ background: '#1e293b' }}>
+<<<<<<< HEAD
                 <th className="px-3 py-2.5"> <input type="checkbox" checked={ displayPending.length > 0 && selectedRows.length === displayPending.length} onChange={toggleAll}/></th>
+=======
+                {isAdmin && (
+                  <th className="px-3 py-2.5"> <input type="checkbox" checked={ displayPending.length > 0 && selectedRows.length === displayPending.length} onChange={toggleAll}/></th>
+                )}
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">#</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">FIELD ORDER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">INSTALLED METER</th>
@@ -295,7 +308,11 @@ async function sendSelectedToNewWork() {
             <tbody>
               {loading ? (
                 <tr>
+<<<<<<< HEAD
                   <td colSpan={9} className="px-4 py-16 text-center">
+=======
+                  <td colSpan={isAdmin ? 9 : 8} className="px-4 py-16 text-center">
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     <div className="flex justify-center">
                       <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
@@ -303,7 +320,11 @@ async function sendSelectedToNewWork() {
                 </tr>
               ) : displayPending.length === 0 ? (
                 <tr>
+<<<<<<< HEAD
                  <td colSpan={9} className="px-4 py-16 text-center text-slate-400">
+=======
+                 <td colSpan={isAdmin ? 9 : 8} className="px-4 py-16 text-center text-slate-400">
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     No pending records.
                   </td>
                 </tr>
@@ -318,6 +339,7 @@ async function sendSelectedToNewWork() {
                         : 'hover:bg-slate-50'
                     }`}
                   >
+<<<<<<< HEAD
                     <td className="px-3 py-2.5">
   <input
     type="checkbox"
@@ -329,6 +351,21 @@ async function sendSelectedToNewWork() {
     onClick={(e) => e.stopPropagation()}
   />
 </td>
+=======
+                    {isAdmin && (
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.includes(row.id)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            toggleRow(row.id)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                    )}
+>>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     <td className="px-3 py-2.5 text-slate-400">{i + 1}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600 font-medium">{row.field_order_no || '—'}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600">{row.ins_meter || '—'}</td>
@@ -339,12 +376,14 @@ async function sendSelectedToNewWork() {
                     </td>
                     <td className="px-3 py-2.5 text-orange-500 font-semibold">PENDING</td>
                     <td className="px-3 py-2.5">
-                      <button
-                        onClick={e => { e.stopPropagation(); removePending(row.id) }}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors"
-                      >
-                        Remove
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={e => { e.stopPropagation(); removePending(row.id) }}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -370,22 +409,26 @@ async function sendSelectedToNewWork() {
                 <h2 className="font-mono font-bold text-slate-800 text-lg">{editRow.field_order_no || `ID #${editRow.id}`}</h2>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={saveToFieldOrders}
-                  disabled={savingToFO || saving}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                >
-                  <CheckCircle size={13} />
-                  {savingToFO ? 'Saving…' : 'Send to New Work'}
-                </button>
-                <button
-                  onClick={updatePending}
-                  disabled={saving || savingToFO}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                >
-                  <Save size={13} />
-                  {saving ? 'Saving…' : 'Update'}
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={saveToFieldOrders}
+                      disabled={savingToFO || saving}
+                      className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <CheckCircle size={13} />
+                      {savingToFO ? 'Saving…' : 'Send to New Work'}
+                    </button>
+                    <button
+                      onClick={updatePending}
+                      disabled={saving || savingToFO}
+                      className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <Save size={13} />
+                      {saving ? 'Saving…' : 'Update'}
+                    </button>
+                  </>
+                )}
                 <button onClick={closeEdit} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                   <X size={18} />
                 </button>
@@ -397,6 +440,8 @@ async function sendSelectedToNewWork() {
             )}
 
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-6">
+
+              <fieldset disabled={!isAdmin} className="space-y-6 border-0 p-0 m-0 min-w-0">
 
               <PS title="Main Information">
                 <PF label="Field Order No.">
@@ -542,14 +587,18 @@ async function sendSelectedToNewWork() {
                 </PF>
               </PS>
 
-              <div className="pt-1 border-t border-slate-100">
-                <button
-                  onClick={() => removePending(editRow.id)}
-                  className="w-full px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Remove from Pending
-                </button>
-              </div>
+              </fieldset>
+
+              {isAdmin && (
+                <div className="pt-1 border-t border-slate-100">
+                  <button
+                    onClick={() => removePending(editRow.id)}
+                    className="w-full px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Remove from Pending
+                  </button>
+                </div>
+              )}
 
             </div>
           </div>
