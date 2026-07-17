@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { X, Save, CheckCircle, Search } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
-const STATUS_CREW_OPTIONS = ['FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
+const STATUS_CREW_OPTIONS = ['FOR ASSIGN', 'ASSIGNED', 'REASSIGN','CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
 const TYPE_OF_METER_OPTIONS = ['12S', '12S ID METER', '1S', '1S EMC L-G', '25S', '2S EMC L-G', '2S EMC L-L', '2S EMX', '2S ID', '2S ID METER', '2S ID METER/ERC', '2S PLAIN METER', '9S', 'EMX', 'ERC 2S PLAIN METER', 'FOR REPLACE', 'KLOAD', 'RETURNED']
 const JOB_DESCRIPTION_OPTIONS = ['REPLACE', 'REPLACE-EMC', 'REPLACE-EMX', 'RETIRE', 'RETIRE-EMC', 'RETIRE-EMC-WIRE']
 const CREW_NAME_OPTIONS = ['A. TOMADA', 'B. VERDARERO', 'C. BENIGNO', 'D. FABOL', 'E. VILLAREAL', 'J. BITAGO', 'J. J. SERRANO']
@@ -233,11 +233,7 @@ async function sendSelectedToNewWork() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-<<<<<<< HEAD
-          {selectedRows.length > 0 && (
-=======
           {isAdmin && selectedRows.length > 0 && (
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
   <>
     <button
       onClick={sendSelectedToNewWork}
@@ -288,18 +284,14 @@ async function sendSelectedToNewWork() {
           <table className="text-xs border-collapse" style={{ minWidth: 'max-content', width: '100%' }}>
             <thead className="sticky top-0 z-10">
               <tr style={{ background: '#1e293b' }}>
-<<<<<<< HEAD
-                <th className="px-3 py-2.5"> <input type="checkbox" checked={ displayPending.length > 0 && selectedRows.length === displayPending.length} onChange={toggleAll}/></th>
-=======
                 {isAdmin && (
                   <th className="px-3 py-2.5"> <input type="checkbox" checked={ displayPending.length > 0 && selectedRows.length === displayPending.length} onChange={toggleAll}/></th>
                 )}
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">#</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">FIELD ORDER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">INSTALLED METER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">CREW NAME</th>
-                <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">SERVICE NUMBER</th>
+                <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">SERVICE ID NUMBER</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">DATE ADDED</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">STATUS</th>
                 <th className="px-3 py-2.5 text-left font-medium text-slate-300 whitespace-nowrap">ACTION</th>
@@ -308,11 +300,7 @@ async function sendSelectedToNewWork() {
             <tbody>
               {loading ? (
                 <tr>
-<<<<<<< HEAD
-                  <td colSpan={9} className="px-4 py-16 text-center">
-=======
                   <td colSpan={isAdmin ? 9 : 8} className="px-4 py-16 text-center">
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     <div className="flex justify-center">
                       <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
@@ -320,11 +308,7 @@ async function sendSelectedToNewWork() {
                 </tr>
               ) : displayPending.length === 0 ? (
                 <tr>
-<<<<<<< HEAD
-                 <td colSpan={9} className="px-4 py-16 text-center text-slate-400">
-=======
                  <td colSpan={isAdmin ? 9 : 8} className="px-4 py-16 text-center text-slate-400">
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     No pending records.
                   </td>
                 </tr>
@@ -339,19 +323,6 @@ async function sendSelectedToNewWork() {
                         : 'hover:bg-slate-50'
                     }`}
                   >
-<<<<<<< HEAD
-                    <td className="px-3 py-2.5">
-  <input
-    type="checkbox"
-    checked={selectedRows.includes(row.id)}
-    onChange={(e) => {
-      e.stopPropagation()
-      toggleRow(row.id)
-    }}
-    onClick={(e) => e.stopPropagation()}
-  />
-</td>
-=======
                     {isAdmin && (
                       <td className="px-3 py-2.5">
                         <input
@@ -365,7 +336,6 @@ async function sendSelectedToNewWork() {
                         />
                       </td>
                     )}
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     <td className="px-3 py-2.5 text-slate-400">{i + 1}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600 font-medium">{row.field_order_no || '—'}</td>
                     <td className="px-3 py-2.5 font-mono text-blue-600">{row.ins_meter || '—'}</td>
@@ -447,7 +417,7 @@ async function sendSelectedToNewWork() {
                 <PF label="Field Order No.">
                   <input value={editForm.field_order_no} onChange={e => sf('field_order_no', e.target.value)} className={iCls} />
                 </PF>
-                <PF label="Service Number">
+                <PF label="Service ID Number">
                   <input value={editForm.service_number} onChange={e => sf('service_number', e.target.value)} className={iCls} />
                 </PF>
                 <PF label="Status Crew">
@@ -467,7 +437,7 @@ async function sendSelectedToNewWork() {
                     <option value="">— Select —</option>
                     {TYPE_OF_METER_OPTIONS.map(option => <option key={option}>{option}</option>)}
                   </select>
-                </PF>
+                </PF> 
                 <PF label="Job Description">
                   <select value={editForm.job_description} onChange={e => sf('job_description', e.target.value)} className={iCls}>
                     <option value="">— Select —</option>

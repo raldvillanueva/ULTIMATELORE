@@ -1,22 +1,9 @@
-<<<<<<< HEAD
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, ClipboardList, Zap, Clock, Archive } from 'lucide-react'
-import logo from '../assets/mb-logo.jpg'
-const navItems = [
-  
-  { to: '/field-orders', icon: ClipboardList, label: 'Field Orders' },
-  { to: '/pending-records', icon: Clock, label: 'Pending Records' },
-  { to: '/new-work-orders', icon: ClipboardList, label: 'New Work Orders' },
-  { to: '/archived-work-orders', icon: Archive, label: 'Archived Work Orders' },
-]
-=======
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { LayoutDashboard, ClipboardList, Clock, Archive, ShieldAlert, LogOut, Eye } from 'lucide-react'
 import logo from '../assets/mb-logo.jpg'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
 
 export default function Sidebar() {
   const { role, profile, session } = useAuth()

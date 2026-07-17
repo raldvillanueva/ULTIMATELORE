@@ -5,7 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 
 const SECTIONS = [
   ['Main Information', [
-    ['field_order_no', 'Field Order No.'], ['service_number', 'Service Number'],
+    ['field_order_no', 'Field Order No.'], ['service_number', 'Service ID Number'],
     ['status_crew', 'Status Crew'], ['date_assign', 'Date Assign', 'date'],
     ['date_executed', 'Date Execution', 'date'], ['type_of_meter', 'Type of Meter'],
     ['job_description', 'Job Description'], ['crew_name', 'Crew Name'], ['location', 'Location'],
@@ -31,7 +31,7 @@ const SECTIONS = [
 
 const inputClass = 'w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
 const SELECT_OPTIONS = {
-  status_crew: ['FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL'],
+  status_crew: ['FOR ASSIGN', 'ASSIGNED', 'REASSIGN','CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL'],
   type_of_meter: ['12S', '12S ID METER', '1S', '1S EMC L-G', '25S', '2S EMC L-G', '2S EMC L-L', '2S EMX', '2S ID', '2S ID METER', '2S ID METER/ERC', '2S PLAIN METER', '9S', 'EMX', 'ERC 2S PLAIN METER', 'FOR REPLACE', 'KLOAD', 'RETURNED'],
   job_description: ['REPLACE', 'REPLACE-EMC', 'REPLACE-EMX', 'RETIRE', 'RETIRE-EMC', 'RETIRE-EMC-WIRE'],
   crew_name: ['A. TOMADA', 'B. VERDARERO', 'C. BENIGNO', 'D. FABOL', 'E. VILLAREAL', 'J. BITAGO', 'J. J. SERRANO'],
@@ -150,17 +150,13 @@ export default function NewWorkOrders() {
     await fetchRecords()
     setBulkCompleting(false)
   }
-
+ 
   return (
     <div className="flex h-[calc(100vh-64px)] flex-col gap-4">
       <div><h1 className="text-2xl font-bold text-slate-800">New Work Orders</h1><p className="mt-0.5 text-sm text-slate-500">Work orders sent from Pending Records and ready for completion.</p></div>
-      <div className="relative shrink-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search FO#, service number, crew, or meter..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+      <div className="relative shrink-0"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search FO#, service ID number, crew, or meter..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-<<<<<<< HEAD
-      {selectedIds.length > 0 && (
-=======
       {isAdmin && selectedIds.length > 0 && (
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
         <div className="flex shrink-0 items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5">
           <p className="text-sm font-medium text-blue-700">{selectedIds.length} selected</p>
           <div className="flex items-center gap-2">
@@ -170,13 +166,8 @@ export default function NewWorkOrders() {
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-<<<<<<< HEAD
-        <table className="w-full text-sm"><thead className="sticky top-0 bg-slate-800 text-xs text-slate-300"><tr><th className="w-10 px-4 py-3 text-center font-medium"><input type="checkbox" checked={records.length > 0 && records.every(record => selectedIds.includes(record.id))} onChange={toggleSelectAll} /></th><th className="px-4 py-3 text-left font-medium">FIELD ORDER</th><th className="px-4 py-3 text-left font-medium">INSTALLED METER</th><th className="px-4 py-3 text-left font-medium">CREW NAME</th><th className="px-4 py-3 text-left font-medium">SERVICE NUMBER</th><th className="px-4 py-3 text-left font-medium">STATUS</th><th className="px-4 py-3 text-right font-medium">ACTION</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-400">Loading new work orders...</td></tr> : records.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-400">No new work orders.</td></tr> : records.map(record => <tr key={record.id} onClick={() => openEdit(record)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"><td className="px-4 py-3 text-center" onClick={event => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(record.id)} onChange={() => toggleSelect(record.id)} /></td><td className="px-4 py-3 font-mono text-blue-600">{record.field_order_no || '—'}</td><td className="px-4 py-3">{record.ins_meter || '—'}</td><td className="px-4 py-3">{record.crew_name || '—'}</td><td className="px-4 py-3">{record.service_number || '—'}</td><td className="px-4 py-3"><span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">NEW</span></td><td className="px-4 py-3 text-right"><button onClick={event => { event.stopPropagation(); completeWorkOrder(record) }} disabled={movingId === record.id} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"><CheckCircle size={14} /> {movingId === record.id ? 'Completing...' : 'Mark Completed'}</button></td></tr>)}</tbody>
-=======
-        <table className="w-full text-sm"><thead className="sticky top-0 bg-slate-800 text-xs text-slate-300"><tr>{isAdmin && <th className="w-10 px-4 py-3 text-center font-medium"><input type="checkbox" checked={records.length > 0 && records.every(record => selectedIds.includes(record.id))} onChange={toggleSelectAll} /></th>}<th className="px-4 py-3 text-left font-medium">FIELD ORDER</th><th className="px-4 py-3 text-left font-medium">INSTALLED METER</th><th className="px-4 py-3 text-left font-medium">CREW NAME</th><th className="px-4 py-3 text-left font-medium">SERVICE NUMBER</th><th className="px-4 py-3 text-left font-medium">STATUS</th><th className="px-4 py-3 text-right font-medium">ACTION</th></tr></thead>
+        <table className="w-full text-sm"><thead className="sticky top-0 bg-slate-800 text-xs text-slate-300"><tr>{isAdmin && <th className="w-10 px-4 py-3 text-center font-medium"><input type="checkbox" checked={records.length > 0 && records.every(record => selectedIds.includes(record.id))} onChange={toggleSelectAll} /></th>}<th className="px-4 py-3 text-left font-medium">FIELD ORDER</th><th className="px-4 py-3 text-left font-medium">INSTALLED METER</th><th className="px-4 py-3 text-left font-medium">CREW NAME</th><th className="px-4 py-3 text-left font-medium">SERVICE ID NUMBER</th><th className="px-4 py-3 text-left font-medium">STATUS</th><th className="px-4 py-3 text-right font-medium">ACTION</th></tr></thead>
           <tbody>{loading ? <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 py-16 text-center text-slate-400">Loading new work orders...</td></tr> : records.length === 0 ? <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 py-16 text-center text-slate-400">No new work orders.</td></tr> : records.map(record => <tr key={record.id} onClick={() => openEdit(record)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50">{isAdmin && <td className="px-4 py-3 text-center" onClick={event => event.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(record.id)} onChange={() => toggleSelect(record.id)} /></td>}<td className="px-4 py-3 font-mono text-blue-600">{record.field_order_no || '—'}</td><td className="px-4 py-3">{record.ins_meter || '—'}</td><td className="px-4 py-3">{record.crew_name || '—'}</td><td className="px-4 py-3">{record.service_number || '—'}</td><td className="px-4 py-3"><span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">NEW</span></td><td className="px-4 py-3 text-right">{isAdmin && <button onClick={event => { event.stopPropagation(); completeWorkOrder(record) }} disabled={movingId === record.id} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"><CheckCircle size={14} /> {movingId === record.id ? 'Completing...' : 'Mark Completed'}</button>}</td></tr>)}</tbody>
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
         </table>
       </div>
 

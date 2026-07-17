@@ -113,11 +113,7 @@ async function restoreSelected() {
         />
       </div>
 
-<<<<<<< HEAD
-      {selectedRows.length > 0 && (
-=======
       {isAdmin && selectedRows.length > 0 && (
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
   <div className="flex justify-end">
     <button
       onClick={restoreSelected}
@@ -140,18 +136,6 @@ async function restoreSelected() {
         <table className="w-full text-sm">
          <thead className="sticky top-0 bg-slate-800 text-xs text-slate-300">
   <tr>
-<<<<<<< HEAD
-    <th className="px-4 py-3">
-      <input
-        type="checkbox"
-        checked={
-          records.length > 0 &&
-          selectedRows.length === records.length
-        }
-        onChange={toggleAll}
-      />
-    </th>
-=======
     {isAdmin && (
       <th className="px-4 py-3">
         <input
@@ -164,36 +148,17 @@ async function restoreSelected() {
         />
       </th>
     )}
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
 
     <th className="px-4 py-3 text-left font-medium">FIELD ORDER</th>
               <th className="px-4 py-3 text-left font-medium">INSTALLED METER</th>
               <th className="px-4 py-3 text-left font-medium">CREW NAME</th>
-              <th className="px-4 py-3 text-left font-medium">SERVICE NUMBER</th>
+              <th className="px-4 py-3 text-left font-medium">SERVICE ID NUMBER</th>
               <th className="px-4 py-3 text-left font-medium">ARCHIVED ON</th>
               <th className="px-4 py-3 text-right font-medium">ACTION</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-<<<<<<< HEAD
-              <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-400">Loading archived work orders...</td></tr>
-            ) : records.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-400">No archived work orders.</td></tr>
-            ) : records.map(record => (
-              <tr key={record.id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-3">
-  <input
-    type="checkbox"
-    checked={selectedRows.includes(record.id)}
-    onChange={(e) => {
-      e.stopPropagation()
-      toggleRow(record.id)
-    }}
-    onClick={(e) => e.stopPropagation()}
-  />
-</td>
-=======
               <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 py-16 text-center text-slate-400">Loading archived work orders...</td></tr>
             ) : records.length === 0 ? (
               <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 py-16 text-center text-slate-400">No archived work orders.</td></tr>
@@ -212,36 +177,12 @@ async function restoreSelected() {
                     />
                   </td>
                 )}
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                 <td className="px-4 py-3 font-mono text-blue-600">{record.field_order_no || '—'}</td>
                 <td className="px-4 py-3">{record.ins_meter || '—'}</td>
                 <td className="px-4 py-3">{record.crew_name || '—'}</td>
                 <td className="px-4 py-3">{record.service_number || '—'}</td>
                 <td className="px-4 py-3 text-slate-500">{record.archived_at ? new Date(record.archived_at).toLocaleDateString() : '—'}</td>
                 <td className="px-4 py-3 text-right">
-<<<<<<< HEAD
-  <div className="flex justify-end gap-2">
-
-    <button
-      onClick={() => navigate(`/field-orders/edit/${record.id}`)}
-      disabled={restoringId === record.id}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-60"
-    >
-      <Pencil size={14} />
-      Edit
-    </button>
-
-    <button
-      onClick={() => restoreRecord(record.id)}
-      disabled={restoringId === record.id}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-    >
-      <ArchiveRestore size={14} />
-      {restoringId === record.id ? 'Restoring…' : 'Restore'}
-    </button>
-
-  </div>
-=======
   {isAdmin && (
     <div className="flex justify-end gap-2">
 
@@ -265,7 +206,6 @@ async function restoreSelected() {
 
     </div>
   )}
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
 </td>
               </tr>
             ))}

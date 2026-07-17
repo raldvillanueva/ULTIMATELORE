@@ -5,10 +5,10 @@ import { Save, X } from 'lucide-react'
 import { addPendingOrders } from '../lib/pendingStorage'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-
+ 
 const EMPTY_FORM = {
   // Main Info
-  status_crew: '',
+  status_crew: 'FOR ASSIGN',
   date_assign: '',
   for_check: false,
   date_executed: '',
@@ -433,15 +433,22 @@ placeholder="Scan Installed Meter"
             <input {...text('field_order_no')} placeholder="e.g. F25090604378" />
           </Field>
 
-          <Field label="Service Number">
+          <Field label="Service ID Number">
             <input {...text('service_number')} placeholder="e.g. 43890272-01" />
           </Field>
 
           <Field label="Status Crew" >
 <select {...text('status_crew')}>
               <option value="">— Select —</option>
+              <option value="FOR ASSIGN">FOR ASSIGN</option>
+              <option value="ASSIGNED">ASSIGNED</option>
+              <option value="RE-ASSIGN">RE-ASSIGN</option>
               <option value="FIELD COMPL.">FIELD COMPL.</option>
               <option value="CANCEL">CANCEL</option>
+              <option value="CANCEL-EMC">CANCEL-EMC</option>
+              <option value="FC CANCEL">FC CANCEL</option>
+              <option value="REVISITED FIELD COM.">REVISITED FIELD COM.</option>
+              <option value="REVISITED CANCEL">REVISITED CANCEL</option>
             </select>
           </Field>
 
@@ -484,8 +491,31 @@ placeholder="Scan Installed Meter"
             </select>
           </Field>
 
-          <Field label="Crew Name" required>
-            <input {...text('crew_name')} placeholder="e.g. J. BITAGO" />
+          <Field label="Crew Name" required errorMessage={fieldErrors.crew_name}>
+            <input
+              value={form.crew_name ?? ''}
+              onChange={e => {
+                const crew = e.target.value
+                setFieldErrors(prev => ({ ...prev, crew_name: false }))
+                setForm(prev => {
+                  let newStatus = prev.status_crew
+                  if (crew.trim() === '') {
+                    newStatus = 'FOR ASSIGN'
+                  } else if (
+                    prev.crew_name &&
+                    prev.crew_name.trim() !== '' &&
+                    prev.crew_name !== crew
+                  ) {
+                    newStatus = 'ASSIGNED'
+                  } else {
+                    newStatus = 'ASSIGNED'
+                  }
+                  return { ...prev, crew_name: crew, status_crew: newStatus }
+                })
+              }}
+              className={`${inputClass} ${fieldErrors.crew_name ? '!border-red-500 !bg-red-200' : ''}`}
+              placeholder="e.g. J. BITAGO"
+            />
           </Field>
 
           <Field label="Location" >
@@ -656,13 +686,19 @@ placeholder="Scan Installed Meter"
             </div>
           </Field>
 
-          <Field label="Remarks" >
-            <textarea
-  {...text('remarks')}
-  rows={3}
-  placeholder="e.g. REPLACE METER FOR LABTEST"
-/>
-          </Field>
+          <Field label="Remarks">
+  <textarea
+    {...text('remarks')}
+    rows={3}
+    maxLength={100}
+    placeholder="e.g. REPLACE METER FOR LABTEST"
+    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#D89B00] focus:ring-2 focus:ring-[#D89B00] resize-none"
+  />
+
+  <div className="mt-1 text-right text-xs text-gray-500">
+    {(form.remarks?.length || 0)}/100 characters
+  </div>
+</Field>
         </div>
       </div>
 

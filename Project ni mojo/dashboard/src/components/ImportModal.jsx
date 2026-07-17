@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { X, Upload, CheckCircle } from 'lucide-react'
-
+ 
 const DB_FIELDS = [
   { key: 'field_order_no',        label: 'Field Order No.' },
-  { key: 'service_number',        label: 'Service Number' },
+  { key: 'service_number',        label: 'Service ID Number' },
   { key: 'status_crew',           label: 'Status Crew' },
   { key: 'date_assign',           label: 'Date Assign' },
   { key: 'date_executed',         label: 'Date Executed' },
@@ -55,7 +55,7 @@ const ALIASES = {
   job_description:       ['job description', 'job desc', 'description', 'job_description'],
   crew_name:             ['crew name', 'crew', 'assigned crew', 'crew_name'],
   location:              ['location', 'address'],
-  service_number:        ['service number', 'service no', 'service no.', 'acct no', 'account number', 'service #'],
+  service_number:        ['service ID number', 'service no', 'service no.', 'acct no', 'account number', 'service #'],
   field_order_no:        ['field order/fo', 'field order no', 'field order no.', 'fo no', 'fo number', 'field order', 'fo#'],
   remove_meter:          ['remove meter', 'removed meter', 'meter removed', 'remove_meter'],
   r_serial_number:       ['r. serial number', 'r serial number', 'removed serial', 'r_serial_number'],

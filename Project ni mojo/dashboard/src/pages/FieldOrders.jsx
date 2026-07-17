@@ -9,7 +9,7 @@ import { computeAgingDays, isOverdue } from '../lib/aging'
 
 const PAGE_SIZE = 50
 
-const STATUS_OPTIONS = ['All', 'FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
+const STATUS_OPTIONS = ['All', 'RE-ASSIGN','FOR ASSIGN', 'ASSIGNED', 'CANCEL', 'CANCEL-EMC', 'FC CANCEL', 'FIELD COMPLETED', 'REVISITED FIELD COM.', 'REVISITED CANCEL']
 const TYPE_OF_METER_OPTIONS = ['All', '12S', '12S ID METER', '1S', '1S EMC L-G', '25S', '2S EMC L-G', '2S EMC L-L', '2S EMX', '2S ID', '2S ID METER', '2S ID METER/ERC', '2S PLAIN METER', '9S', 'EMX', 'ERC 2S PLAIN METER', 'FOR REPLACE', 'KLOAD', 'RETURNED']
 const JOB_DESCRIPTION_OPTIONS = ['All', 'REPLACE', 'REPLACE-EMC', 'REPLACE-EMX', 'RETIRE', 'RETIRE-EMC', 'RETIRE-EMC-WIRE']
 const CREW_NAME_OPTIONS = ['All', 'A. TOMADA', 'B. VERDARERO', 'C. BENIGNO', 'D. FABOL', 'E. VILLAREAL', 'J. BITAGO', 'J. J. SERRANO']
@@ -18,7 +18,7 @@ const BILLED_AMOUNT_OPTIONS = ['All', '0', '172.45', '253.43', '344.9', '383.22'
 const BATCH_OPTIONS = ['All', 'ALREADY BATCH', 'FOR BATCH', 'MISSING METER', 'OTHERS PENDING']
 
 const EMPTY_FORM = {
-  status_crew: '', date_assign: '', for_check: false, date_executed: '', type_of_meter: '',
+  status_crew: 'FOR ASSIGN', date_assign: '', for_check: false, date_executed: '', type_of_meter: '',
   job_description: '', crew_name: '', location: '', service_number: '', field_order_no: '',
   remove_meter: '', r_serial_number: '', demand_seal_aerolock: '', removed_seal: '',
   cabinet_seal_remove: '', reading_kwh: '', demand_kwh_cum: '', ins_meter: '', ins_serial_number: '',
@@ -74,7 +74,7 @@ const COLS = [
   { label: 'JOB DESCRIPTION',     key: 'job_description',       w: 120, render: r => r.job_description || '—' },
   { label: 'CREW NAME',           key: 'crew_name',             w: 130, render: r => r.crew_name || '—' },
   { label: 'FIELD ORDER/FO',      key: 'field_order_no',        w: 145, mono: true, render: r => r.field_order_no || '—' },
-  { label: 'SERVICE NUMBER',      key: 'service_number',        w: 135, render: r => r.service_number || '—' },
+  { label: 'SERVICE ID NUMBER',      key: 'service_number',        w: 135, render: r => r.service_number || '—' },
   // — REMOVE METER —
   { label: 'REMOVE METER',        key: 'remove_meter',          w: 130, render: r => r.remove_meter || '—' },
   { label: 'R. SERIAL NUMBER',    key: 'r_serial_number',       w: 130, render: r => r.r_serial_number || '—' },
@@ -135,6 +135,7 @@ export default function FieldOrders() {
   const [billedAmountFilter, setBilledAmountFilter] = useState('All')
   const [batchFilter, setBatchFilter] = useState('All')
   const [dateExecutedFilter, setDateExecutedFilter] = useState('')
+  const [dateAssignFilter, setDateAssignFilter] = useState('')
   const [openFilterKey, setOpenFilterKey] = useState(null)
   const [filterPos, setFilterPos] = useState({ x: 0, y: 0 })
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -160,7 +161,7 @@ function deleteSelected() {
     onConfirm: async () => {
       if (selectAllPages) {
         let q = supabase.from('field_orders').delete().is('archived_at', null)
-        const hasFilters = search || statusFilter !== 'All' || typeOfMeterFilter !== 'All' || jobDescriptionFilter !== 'All' || crewNameFilter !== 'All' || foTypeFilter !== 'All' || billedAmountFilter !== 'All' || batchFilter !== 'All' || dateExecutedFilter
+        const hasFilters = search || statusFilter !== 'All' || typeOfMeterFilter !== 'All' || jobDescriptionFilter !== 'All' || crewNameFilter !== 'All' || foTypeFilter !== 'All' || billedAmountFilter !== 'All' || batchFilter !== 'All' || dateExecutedFilter || dateAssignFilter
         if (!hasFilters) {
           q = q.neq('id', '00000000-0000-0000-0000-000000000000')
         } else {
@@ -173,6 +174,7 @@ function deleteSelected() {
           if (billedAmountFilter !== 'All') q = q.eq('billed_amount', parseFloat(billedAmountFilter))
           if (batchFilter !== 'All') q = q.ilike('for_batch', batchFilter)
           if (dateExecutedFilter) q = q.eq('date_executed', dateExecutedFilter)
+          if (dateAssignFilter) q = q.eq('date_assign', dateAssignFilter)
         }
         await q
       } else {
@@ -194,7 +196,7 @@ function archiveSelected() {
     onConfirm: async () => {
       if (selectAllPages) {
         let q = supabase.from('field_orders').update({ archived_at: new Date().toISOString() }).is('archived_at', null)
-        const hasFilters = search || statusFilter !== 'All' || typeOfMeterFilter !== 'All' || jobDescriptionFilter !== 'All' || crewNameFilter !== 'All' || foTypeFilter !== 'All' || billedAmountFilter !== 'All' || batchFilter !== 'All' || dateExecutedFilter
+        const hasFilters = search || statusFilter !== 'All' || typeOfMeterFilter !== 'All' || jobDescriptionFilter !== 'All' || crewNameFilter !== 'All' || foTypeFilter !== 'All' || billedAmountFilter !== 'All' || batchFilter !== 'All' || dateExecutedFilter || dateAssignFilter
         if (!hasFilters) {
           q = q.neq('id', '00000000-0000-0000-0000-000000000000')
         } else {
@@ -207,6 +209,7 @@ function archiveSelected() {
           if (billedAmountFilter !== 'All') q = q.eq('billed_amount', parseFloat(billedAmountFilter))
           if (batchFilter !== 'All') q = q.ilike('for_batch', batchFilter)
           if (dateExecutedFilter) q = q.eq('date_executed', dateExecutedFilter)
+          if (dateAssignFilter) q = q.eq('date_assign', dateAssignFilter)
         }
         await q
       } else {
@@ -261,11 +264,12 @@ prev.filter(x=>x!==id)
     if (billedAmountFilter !== 'All') q = q.eq('billed_amount', parseFloat(billedAmountFilter))
     if (batchFilter !== 'All') q = q.ilike('for_batch', batchFilter)
     if (dateExecutedFilter) q = q.eq('date_executed', dateExecutedFilter)
+    if (dateAssignFilter) q = q.eq('date_assign', dateAssignFilter)
 
     const { data, count, error } = await q
     if (!error) { setRecords(data); setTotal(count) }
     setLoading(false)
-  }, [page, search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter])
+  }, [page, search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter, dateAssignFilter])
 
 useEffect(() => { 
   fetchRecords() 
@@ -276,7 +280,7 @@ useEffect(() => {
   setPage(0)
   setSelectAllPages(false)
   setSelectedRows([])
-}, [search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter])
+}, [search, statusFilter, typeOfMeterFilter, jobDescriptionFilter, crewNameFilter, foTypeFilter, billedAmountFilter, batchFilter, dateExecutedFilter,  dateAssignFilter])
 
 
   const ROW_HEIGHT = 33
@@ -462,7 +466,7 @@ useEffect(() => {
     { key: 'job_description',       label: 'Job Description' },
     { key: 'crew_name',             label: 'Crew Name' },
     { key: 'location',              label: 'Location' },
-    { key: 'service_number',        label: 'Service Number' },
+    { key: 'service_number',        label: 'Service ID Number' },
     { key: 'field_order_no',        label: 'Field Order/FO' },
     { key: 'remove_meter',          label: 'Remove Meter' },
     { key: 'r_serial_number',       label: 'R. Serial Number' },
@@ -527,6 +531,7 @@ useEffect(() => {
 
   const COL_FILTER_KEYS = {
     status_crew:    { options: STATUS_OPTIONS,        value: statusFilter,        set: setStatusFilter,        isActive: () => statusFilter !== 'All' },
+    date_assign: { type: 'date', value: dateAssignFilter, set: setDateAssignFilter, isActive: () => !!dateAssignFilter,},
     date_executed:  { type: 'date',                   value: dateExecutedFilter,  set: setDateExecutedFilter,  isActive: () => !!dateExecutedFilter },
     type_of_meter:  { options: TYPE_OF_METER_OPTIONS, value: typeOfMeterFilter,   set: setTypeOfMeterFilter,   isActive: () => typeOfMeterFilter !== 'All' },
     job_description:{ options: JOB_DESCRIPTION_OPTIONS,value: jobDescriptionFilter,set: setJobDescriptionFilter,isActive: () => jobDescriptionFilter !== 'All' },
@@ -621,7 +626,7 @@ Add Record
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search FO#, service no, crew, location..."
+            placeholder="Search FO#, Service ID Number, crew, location..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -704,30 +709,6 @@ Add Record
             <table className="text-xs border-collapse" style={{ width: 'max-content', tableLayout: 'fixed' }}>
               <thead className="sticky top-0 z-20">
                 <tr style={{ background: '#1e293b', height: 37 }}>
-<<<<<<< HEAD
-                  <th
-                    style={{ width: 40, minWidth: 40, background: '#1e293b' }}
-                    className="px-2 py-2.5 text-center font-medium text-slate-300 border-r border-slate-700"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={
-                        records.length > 0 &&
-                        records.every(r => selectedRows.includes(r.id))
-                      }
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedRows(prev => {
-                            const newIds = records.map(r => r.id).filter(id => !prev.includes(id))
-                            return [...prev, ...newIds]
-                          })
-                        } else {
-                          setSelectedRows(prev => prev.filter(id => !records.map(r => r.id).includes(id)))
-                        }
-                      }}
-                    />
-                  </th>
-=======
                   {isAdmin && (
                     <th
                       style={{ width: 40, minWidth: 40, background: '#1e293b' }}
@@ -752,7 +733,6 @@ Add Record
                       />
                     </th>
                   )}
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                   <th
                     style={{ width: 40, minWidth: 40, background: '#1e293b' }}
                     className="px-2 py-2.5 text-center font-medium text-slate-400 border-r border-slate-700"
@@ -789,11 +769,7 @@ Add Record
               <tbody>
                 {loading ? (
                   <tr>
-<<<<<<< HEAD
-                    <td colSpan={FROZEN_COLS.length + 2} className="px-4 py-16 text-center">
-=======
                     <td colSpan={FROZEN_COLS.length + (isAdmin ? 2 : 1)} className="px-4 py-16 text-center">
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                       <div className="flex justify-center">
                         <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                       </div>
@@ -801,21 +777,13 @@ Add Record
                   </tr>
                 ) : records.length === 0 ? (
                   <tr>
-<<<<<<< HEAD
-                    <td colSpan={FROZEN_COLS.length + 2} className="px-4 py-16 text-center text-slate-400">No records found.</td>
-=======
                     <td colSpan={FROZEN_COLS.length + (isAdmin ? 2 : 1)} className="px-4 py-16 text-center text-slate-400">No records found.</td>
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                   </tr>
                 ) : (
                   records.map((row, idx) => {
                     const sel = editRow?.id === row.id
-<<<<<<< HEAD
-                    const rowBg = sel ? '#eff6ff' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
-=======
                     const overdue = isOverdue(row)
                     const rowBg = sel ? '#eff6ff' : overdue ? '#fef2f2' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     return (
                       <tr
                         key={row.id}
@@ -825,22 +793,6 @@ Add Record
                         style={{ background: rowBg, height: 33 }}
                         className={`cursor-pointer border-b border-slate-100 transition-colors ${sel ? 'outline outline-2 outline-blue-400 outline-offset-[-2px]' : ''}`}
                       >
-<<<<<<< HEAD
-                        <td className="px-2 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedRows.includes(row.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleRow(row.id)}
-                          />
-                        </td>
-                        <td
-                          style={{ width: 40, minWidth: 40 }}
-                          className="px-2 py-2 text-center text-slate-400 border-r border-slate-100"
-                        >
-                          {page * PAGE_SIZE + idx + 1}
-                        </td>
-=======
                         {isAdmin && (
                           <td className="px-2 py-2 text-center">
                             <input
@@ -857,7 +809,6 @@ Add Record
                         >
                           {page * PAGE_SIZE + idx + 1}
                         </td>
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                         {FROZEN_COLS.map(col => (
                           <td
                             key={col.key}
@@ -927,12 +878,8 @@ Add Record
                 ) : (
                   records.map((row, idx) => {
                     const sel = editRow?.id === row.id
-<<<<<<< HEAD
-                    const rowBg = sel ? '#eff6ff' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
-=======
                     const overdue = isOverdue(row)
                     const rowBg = sel ? '#eff6ff' : overdue ? '#fef2f2' : (hoverRowId === row.id ? '#f8fafc' : '#ffffff')
->>>>>>> 4bfb770 (CHANGES MADE PART 1)
                     return (
                       <tr
                         key={row.id}
@@ -1043,7 +990,7 @@ Add Record
                 <PF label="Field Order No.">
                   <input value={editForm.field_order_no} onChange={e => sf('field_order_no', e.target.value)} className={iCls} />
                 </PF>
-                <PF label="Service Number">
+                <PF label="Service ID Number">
                   <input value={editForm.service_number} onChange={e => sf('service_number', e.target.value)} className={iCls} />
                 </PF>
                 <PF label="Status Crew">
@@ -1051,6 +998,7 @@ Add Record
                     <option value="">— Select —</option>
                     <option>FOR ASSIGN</option>
                     <option>ASSIGNED</option>
+                    <option>RE-ASSIGN</option>
                     <option>FIELD COMPL.</option>
                     <option>CANCEL</option>
                     <option>CANCEL-EMC</option>
@@ -1078,11 +1026,37 @@ Add Record
                   </select>
                 </PF>
                 <PF label="Crew Name">
-                  <select value={editForm.crew_name} onChange={e => sf('crew_name', e.target.value)} className={iCls}>
-                    <option value="">— Select —</option>
-                    {CREW_NAME_OPTIONS.slice(1).map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </PF>
+  <input
+    value={editForm.crew_name}
+    onChange={e => {
+    const crew = e.target.value
+
+    setEditForm(prev => {
+        let newStatus = prev.status_crew
+
+        if (crew.trim() === '') {
+            newStatus = 'FOR ASSIGN'
+        } else if (
+            prev.crew_name &&
+            prev.crew_name.trim() !== '' &&
+            prev.crew_name !== crew
+        ) {
+            newStatus = 'RE-ASSIGN'
+        } else {
+            newStatus = 'ASSIGNED'
+        }
+
+        return {
+            ...prev,
+            crew_name: crew,
+            status_crew: newStatus
+        }
+    })
+}}
+    className={iCls}
+    placeholder="Enter crew name"
+  />
+</PF>
                 <PF label="Location" span2>
                   <input value={editForm.location} onChange={e => sf('location', e.target.value)} className={iCls} />
                 </PF>
@@ -1192,8 +1166,18 @@ Add Record
                   </label>
                 </PF>
                 <PF label="Remarks" span2>
-                  <textarea value={editForm.remarks} onChange={e => sf('remarks', e.target.value)} rows={3} className={`${iCls} resize-none`} />
-                </PF>
+  <textarea
+    value={editForm.remarks}
+    onChange={e => sf('remarks', e.target.value)}
+    rows={3}
+    maxLength={100}
+    className={`${iCls} resize-none`}
+  />
+
+  <p className="text-xs text-gray-500 mt-1">
+    {(editForm.remarks || '').length}/100
+  </p>
+</PF>
               </PS>
 
               </fieldset>
